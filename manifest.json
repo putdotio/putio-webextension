@@ -3,7 +3,7 @@
    
    "name": "put.io",
    "description": "Easily download links with put.io",
-   "version": "0.1.3",
+   "version": "0.1.4",
 
    "permissions": [ "http://*/", "https://*/", "tabs", "contextMenus"],
    "browser_action": {

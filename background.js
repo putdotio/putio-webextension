@@ -1,6 +1,6 @@
 function getClickHandler() {
   return function(info, tab) {
-    var url = 'https://put.io/magnet?url=' + info.linkUrl;
+    var url = 'https://put.io/magnet?url=' + encodeURIComponent(info.linkUrl);
     chrome.tabs.create({ url: url});
   };
 };
