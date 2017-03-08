@@ -14,6 +14,9 @@
       "128": "icon128.png"
    },
    "background": {
-      "scripts": ["background.js"]
+      "scripts": [
+         "browser-polyfill.js",
+         "background.js"
+      ]
    }
 }
