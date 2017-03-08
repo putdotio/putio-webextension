@@ -1,0 +1,14 @@
+{
+  "extensionName": {
+    "message": "put.io",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Adds an option to right-click menu that downloads the link with put.io.",
+    "description": "Description of the add-on."
+  },
+  "downloadMenuItem": {
+    "message": "Download with put.io",
+    "description": "Title of context menu item that downloads the selected link."
+  }
+}

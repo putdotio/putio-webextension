@@ -1,12 +1,12 @@
 function getClickHandler() {
   return function(info, tab) {
-    var url = 'https://put.io/magnet?url=' + encodeURIComponent(info.linkUrl);
-    chrome.tabs.create({ url: url});
+    var url = 'https://app.put.io/magnet?url=' + encodeURIComponent(info.linkUrl);
+    browser.tabs.create({ url: url});
   };
 };
 
-chrome.contextMenus.create({
-  "title" : "Download with put.io",
+browser.contextMenus.create({
+  "title" :browser.i18n.getMessage("downloadMenuItem"),
   "type" : "normal",
   "contexts" : ["link"],
   "onclick" : getClickHandler()

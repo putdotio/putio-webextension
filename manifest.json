@@ -1,15 +1,14 @@
 {
    "manifest_version": 2,
-   
-   "name": "put.io",
-   "description": "Easily download links with put.io",
-   "version": "0.1.4",
-
-   "permissions": [ "http://*/", "https://*/", "tabs", "contextMenus"],
+   "name": "__MSG_extensionName__",
+   "description": "__MSG_extensionDescription__",
+   "version": "1.0.0",
+   "default_locale": "en",
+   "permissions": ["contextMenus"],
    "browser_action": {
       "default_icon": "icon.png"
    },
-   "icons": { 
+   "icons": {
       "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
