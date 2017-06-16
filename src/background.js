@@ -1,9 +1,10 @@
 var apiURL = 'https://api.put.io/v2'
+var appURL = 'https://app.put.io'
 var storageKey = 'putio-webextension'
 
 browser
   .storage.local.get()
-  .then(storage => {
+  .then((storage) => {
     var extensionStorage = storage.storageKey
 
     if (!extensionStorage || !extensionStorage.token) {
@@ -40,6 +41,41 @@ function validate(redirectURL) {
 function initialize(token) {
   var notificationIcon = browser.extension.getURL('icon-notify.png')
 
+  function checkTransferStatus(transfer) {
+    console.log(transfer)
+
+    var url = apiURL + '/transfers/' + transfer.id
+
+    var xhr = new XMLHttpRequest()
+
+    xhr.open('GET', url, true)
+    xhr.setRequestHeader('authorization', 'token ' + token)
+
+    xhr.onload = function () {
+      if (xhr.readyState == 4) {
+        const response = JSON.parse(xhr.responseText)
+
+        if (response.transfer.file_id) {
+          browser.notifications.create('transfer-finished-' + response.transfer.id + '-' + response.transfer.file_id, {
+            type: 'basic',
+            iconUrl: notificationIcon,
+            title: 'Transfer Finished!',
+            message: response.transfer.name + ' is downloaded!',
+            buttons: [
+              {
+                title: 'Go To File',
+              }
+            ],
+          })
+        } else {
+          setTimeout(checkTransferStatus.bind(null, response.transfer), 10000)
+        }
+      }
+    }
+
+    xhr.send(null)
+  }
+
   function onDownload(info, tab) {
     var url = apiURL + '/transfers/add'
 
@@ -57,12 +93,14 @@ function initialize(token) {
       if (xhr.readyState == 4) {
         const response = JSON.parse(xhr.responseText)
 
-        browser.notifications.create('transfer-start-success', {
+        browser.notifications.create('transfer-start-success-' + response.transfer.id, {
           type: 'basic',
           iconUrl: notificationIcon,
           title: 'Transfer Started!',
           message: 'We will let you know when ' + response.transfer.name + ' is downloaded!',
         })
+
+        setTimeout(checkTransferStatus.bind(null, response.transfer), 3000)
       } else {
         const response = JSON.parse(xhr.responseText)
 
@@ -85,17 +123,21 @@ function initialize(token) {
   })
 
   browser.notifications.onClicked.addListener(function(notificationId) {
-    console.log(notificationId)
+    browser.notifications.clear(notificationId)
+  })
 
-    switch (notificationId) {
-      case 'transfer-start-success':
-      case 'transfer-start-failure':
-        browser.notifications.clear(notificationId)
-        break
+  browser.notifications.onButtonClicked.addListener(function(notificationId) {
+    var transferId = notificationId.split('-')[2]
+    var fileId = notificationId.split('-')[3]
+    var url = appURL + '/files/' + fileId
 
-      default:
-        break
-    }
+    browser.notifications.clear('transfer-start-success-' + transferId)
+    browser.notifications.clear(notificationId)
+
+    browser.tabs.create({
+      active: true,
+      url: url,
+    })
   })
 }
 
