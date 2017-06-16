@@ -1,9 +1,10 @@
 var apiURL = 'https://api.put.io/v2'
+var storageKey = 'putio-webextension'
 
 browser
   .storage.local.get()
   .then(storage => {
-    var extensionStorage = storage['putio-webextension']
+    var extensionStorage = storage.storageKey
 
     if (!extensionStorage || !extensionStorage.token) {
       authorize()
@@ -31,13 +32,15 @@ function validate(redirectURL) {
 
   browser
     .storage.local.set({
-      'putio-webextension': { token: token },
+      [storageKey]: { token: token },
     })
-    .then(() => register(token))
+    .then(() => initialize(token))
 }
 
-function register(token) {
-  function onClick(info, tab) {
+function initialize(token) {
+  var notificationIcon = browser.extension.getURL('icon-notify.png')
+
+  function onDownload(info, tab) {
     var url = apiURL + '/transfers/add'
 
     var data = JSON.stringify({
@@ -50,12 +53,25 @@ function register(token) {
     xhr.setRequestHeader('Content-type','application/json; charset=utf-8')
     xhr.setRequestHeader('authorization', 'token ' + token)
 
-    // @TODO Show notifications
     xhr.onload = function () {
       if (xhr.readyState == 4) {
-        console.log(xhr.responseText)
+        const response = JSON.parse(xhr.responseText)
+
+        browser.notifications.create('transfer-start-success', {
+          type: 'basic',
+          iconUrl: notificationIcon,
+          title: 'Transfer Started!',
+          message: 'We will let you know when ' + response.transfer.name + ' is downloaded!',
+        })
       } else {
-        console.error(xhr.responseText)
+        const response = JSON.parse(xhr.responseText)
+
+        browser.notifications.create('transfer-start-failure', {
+          type: 'basic',
+          iconUrl: notificationIcon,
+          title: 'Oops!',
+          message: 'We are unable to download that :/',
+        })
       }
     }
 
@@ -65,7 +81,21 @@ function register(token) {
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadMenuItem'),
     contexts: ['link'],
-    onclick: onClick,
+    onclick: onDownload,
+  })
+
+  browser.notifications.onClicked.addListener(function(notificationId) {
+    console.log(notificationId)
+
+    switch (notificationId) {
+      case 'transfer-start-success':
+      case 'transfer-start-failure':
+        browser.notifications.clear(notificationId)
+        break
+
+      default:
+        break
+    }
   })
 }
 
