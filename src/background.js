@@ -1,14 +1,17 @@
 var apiURL = 'https://api.put.io/v2'
 var appURL = 'https://app.put.io'
 var storageKey = 'putio-webextension'
+var notificationIcon = browser.extension.getURL('icon-notify.png')
 
 browser
   .storage.local.get()
   .then((storage) => {
-    var extensionStorage = storage.storageKey
+    var extensionStorage = storage[storageKey]
 
     if (!extensionStorage || !extensionStorage.token) {
       authorize()
+    } else {
+      initialize(extensionStorage.token)
     }
   })
 
@@ -31,19 +34,24 @@ function authorize() {
 function validate(redirectURL) {
   var token = redirectURL.split('#access_token=')[1]
 
-  browser
-    .storage.local.set({
-      [storageKey]: { token: token },
+  if (token) {
+    browser.notifications.create('validate-success', {
+      type: 'basic',
+      iconUrl: notificationIcon,
+      title: 'Welcome!',
+      message: 'You can use the right click menu for downloading items to your put.io account!',
     })
-    .then(() => initialize(token))
+
+    browser
+      .storage.local.set({
+        [storageKey]: { token: token },
+      })
+      .then(() => initialize(token))
+  }
 }
 
 function initialize(token) {
-  var notificationIcon = browser.extension.getURL('icon-notify.png')
-
   function checkTransferStatus(transfer) {
-    console.log(transfer)
-
     var url = apiURL + '/transfers/' + transfer.id
 
     var xhr = new XMLHttpRequest()
