@@ -10,6 +10,30 @@
   "downloadMenuItem": {
     "message": "Download with put.io",
     "description": "Title of context menu item that downloads the selected link."
+  },
+  "welcomeNotificationTitle": {
+    "message": "Welcome!",
+    "description": "Title of the welcome notification"
+  },
+  "welcomeNotificationMessage": {
+    "message": "You can use the right click menu for downloading items to your put.io account!!",
+    "description": "Body of the welcome notification"
+  },
+  "transferStartNotificationTitle": {
+    "message": "Starting transfer...",
+    "description": "Title of the transfer start notification"
+  },
+  "transferStartNotificationMessage": {
+    "message": "We are starting your transfer. You can click this message and go to your transfers page",
+    "description": "Body of the transfer start notification"
+  },
+  "transferFailureNotificationTitle": {
+    "message": "Oops!",
+    "description": "Title of the transfer failure notification"
+  },
+  "transferFailureNotificationMessage": {
+    "message": "We are unable to download that :-/",
+    "description": "Description of the transfer failure notification"
   }
 }
 

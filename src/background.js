@@ -4,6 +4,14 @@ var storageKey = 'putio-webextension'
 var notificationIcon = browser.extension.getURL('icon-notify.png')
 
 browser
+  .browserAction.onClicked.addListener(function() {
+    browser.tabs.create({
+      active: true,
+      url: appURL,
+    })
+  })
+
+browser
   .storage.local.get()
   .then((storage) => {
     var extensionStorage = storage[storageKey]
@@ -38,8 +46,8 @@ function validate(redirectURL) {
     browser.notifications.create('validate-success', {
       type: 'basic',
       iconUrl: notificationIcon,
-      title: 'Welcome!',
-      message: 'You can use the right click menu for downloading items to your put.io account!',
+      title: browser.i18n.getMessage('welcomeNotificationTitle'),
+      message: browser.i18n.getMessage('welcomeNotificationMessage'),
     })
 
     browser
@@ -51,40 +59,14 @@ function validate(redirectURL) {
 }
 
 function initialize(token) {
-  function checkTransferStatus(transfer) {
-    var url = apiURL + '/transfers/' + transfer.id
-
-    var xhr = new XMLHttpRequest()
-
-    xhr.open('GET', url, true)
-    xhr.setRequestHeader('authorization', 'token ' + token)
-
-    xhr.onload = function () {
-      if (xhr.readyState == 4) {
-        const response = JSON.parse(xhr.responseText)
-
-        if (response.transfer.file_id) {
-          browser.notifications.create('transfer-finished-' + response.transfer.id + '-' + response.transfer.file_id, {
-            type: 'basic',
-            iconUrl: notificationIcon,
-            title: 'Transfer Finished!',
-            message: response.transfer.name + ' is downloaded!',
-            buttons: [
-              {
-                title: 'Go To File',
-              }
-            ],
-          })
-        } else {
-          setTimeout(checkTransferStatus.bind(null, response.transfer), 10000)
-        }
-      }
-    }
-
-    xhr.send(null)
-  }
-
   function onDownload(info, tab) {
+    browser.notifications.create('transfer-start', {
+      type: 'basic',
+      iconUrl: notificationIcon,
+      title: browser.i18n.getMessage('transferStartNotificationTitle'),
+      message: browser.i18n.getMessage('transferStartNotificationMessage'),
+    })
+
     var url = apiURL + '/transfers/add'
 
     var data = JSON.stringify({
@@ -98,25 +80,14 @@ function initialize(token) {
     xhr.setRequestHeader('authorization', 'token ' + token)
 
     xhr.onload = function () {
-      if (xhr.readyState == 4) {
-        const response = JSON.parse(xhr.responseText)
-
-        browser.notifications.create('transfer-start-success-' + response.transfer.id, {
-          type: 'basic',
-          iconUrl: notificationIcon,
-          title: 'Transfer Started!',
-          message: 'We will let you know when ' + response.transfer.name + ' is downloaded!',
-        })
-
-        setTimeout(checkTransferStatus.bind(null, response.transfer), 3000)
-      } else {
+      if (!xhr.readyState == 4) {
         const response = JSON.parse(xhr.responseText)
 
         browser.notifications.create('transfer-start-failure', {
           type: 'basic',
           iconUrl: notificationIcon,
-          title: 'Oops!',
-          message: 'We are unable to download that :/',
+          title: browser.i18n.getMessage('transferFailureNotificationTitle'),
+          message: browser.i18n.getMessage('transferFailureNotificationMessage'),
         })
       }
     }
@@ -131,21 +102,16 @@ function initialize(token) {
   })
 
   browser.notifications.onClicked.addListener(function(notificationId) {
+    if (notificationId === 'transfer-start') {
+      var url = appURL + '/transfers'
+
+      browser.tabs.create({
+        active: true,
+        url: url,
+      })
+    }
+
     browser.notifications.clear(notificationId)
-  })
-
-  browser.notifications.onButtonClicked.addListener(function(notificationId) {
-    var transferId = notificationId.split('-')[2]
-    var fileId = notificationId.split('-')[3]
-    var url = appURL + '/files/' + fileId
-
-    browser.notifications.clear('transfer-start-success-' + transferId)
-    browser.notifications.clear(notificationId)
-
-    browser.tabs.create({
-      active: true,
-      url: url,
-    })
   })
 }
 
