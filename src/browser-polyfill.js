@@ -849,3 +849,4 @@ if (typeof browser === "undefined") {
 
   this.browser = wrapAPIs();
 }
+
