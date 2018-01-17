@@ -6,7 +6,7 @@
   "default_locale": "en",
   "applications": {
     "gecko": {
-      "id": "devs@put.io"
+      "id": "firefox-addon@put.io"
     }
   },
   "homepage_url": "https://github.com/putdotio/putio-webextension",
