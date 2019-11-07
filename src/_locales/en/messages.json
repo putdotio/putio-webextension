@@ -8,8 +8,12 @@
     "description": "Description of the add-on."
   },
   "downloadMenuItem": {
-    "message": "Download with put.io",
+    "message": "Download link with put.io",
     "description": "Title of context menu item that downloads the selected link."
+  },
+  "downloadPageMenuItem": {
+    "message": "Download page with put.io",
+    "description": "Title of context menu item that downloads the current page."
   },
   "welcomeNotificationTitle": {
     "message": "Welcome!",

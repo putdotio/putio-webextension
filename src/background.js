@@ -59,7 +59,7 @@ function validate(redirectURL) {
 }
 
 function initialize(token) {
-  function onDownload(info, tab) {
+  function startDownload(link) {
     browser.notifications.create('transfer-start', {
       type: 'basic',
       iconUrl: notificationIcon,
@@ -70,7 +70,7 @@ function initialize(token) {
     var url = apiURL + '/transfers/add'
 
     var data = JSON.stringify({
-      url: info.linkUrl,
+      url: link,
     })
 
     var xhr = new XMLHttpRequest()
@@ -98,7 +98,17 @@ function initialize(token) {
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadMenuItem'),
     contexts: ['link'],
-    onclick: onDownload,
+    onclick: function(info, tab) {
+      startDownload(info.linkUrl)
+    }
+  })
+
+  browser.contextMenus.create({
+    title: browser.i18n.getMessage('downloadPageMenuItem'),
+    contexts: ["page"],
+    onclick: function(info, tab) {
+      startDownload(tab.url)
+    }
   })
 
   browser.notifications.onClicked.addListener(function(notificationId) {
