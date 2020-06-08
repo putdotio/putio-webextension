@@ -1,0 +1,25 @@
+{
+  "name": "putio-webextension",
+  "version": "2.3.0",
+  "description": "Download links to put.io with right-click in browsers",
+  "main": "src/background.js",
+  "prettier": "@putdotio/prettier-config",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/putdotio/putio-webextension.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/putdotio/putio-webextension/issues"
+  },
+  "homepage": "https://github.com/putdotio/putio-webextension#readme",
+  "devDependencies": {
+    "@putdotio/prettier-config": "^1.0.0",
+    "prettier": "^1.19.1"
+  }
+}
