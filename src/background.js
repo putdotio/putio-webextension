@@ -1,65 +1,78 @@
+var clientID = '2939'
 var apiURL = 'https://api.put.io/v2'
 var appURL = 'https://app.put.io'
 var storageKey = 'putio-webextension'
 var notificationIcon = browser.extension.getURL('icon-notify.png')
 
-browser
-  .browserAction.onClicked.addListener(function() {
-    browser.tabs.create({
-      active: true,
-      url: appURL,
-    })
-  })
+browser.storage.local.get().then((storage) => {
+  var extensionStorage = storage[storageKey]
 
-browser
-  .storage.local.get()
-  .then((storage) => {
-    var extensionStorage = storage[storageKey]
+  if (!extensionStorage || !extensionStorage.token) {
+    return startAuthFlow()
+  }
 
-    if (!extensionStorage || !extensionStorage.token) {
-      authorize()
-    } else {
-      initialize(extensionStorage.token)
-    }
-  })
+  return validateToken(extensionStorage.token, { notify: false })
+})
 
-function authorize() {
+function startAuthFlow() {
   var redirectURL = browser.identity.getRedirectURL()
-  var clientID = '2939'
-
   var authURL = apiURL + '/oauth2/authenticate'
+  authURL += '?client_id=' + clientID
+  authURL += '&response_type=token'
+  authURL += '&redirect_uri=' + encodeURIComponent(redirectURL)
 
-  authURL += ('?client_id=' + clientID)
-  authURL += ('&response_type=token')
-  authURL += ('&redirect_uri=' + encodeURIComponent(redirectURL))
-
-  return browser.identity.launchWebAuthFlow({
-    interactive: true,
-    url: authURL,
-  }, validate)
+  return browser.identity.launchWebAuthFlow(
+    {
+      interactive: true,
+      url: authURL,
+    },
+    handleAuthCallback,
+  )
 }
 
-function validate(redirectURL) {
+function handleAuthCallback(redirectURL) {
   var token = redirectURL.split('#access_token=')[1]
+  validateToken(token, { notify: true })
+}
 
-  if (token) {
+function validateToken(token, options) {
+  fetch(apiURL + '/oauth2/validate', {
+    headers: {
+      authorization: 'token ' + token,
+    },
+  })
+    .then(function (response) {
+      if (response.ok) {
+        return validateTokenSuccess(token, options)
+      }
+
+      return validateTokenFailure(response)
+    })
+    .catch(validateTokenFailure)
+}
+
+function validateTokenSuccess(token, options) {
+  console.log('PutioWebExtension - Token validated!')
+
+  if (options.notify) {
     browser.notifications.create('validate-success', {
       type: 'basic',
       iconUrl: notificationIcon,
       title: browser.i18n.getMessage('welcomeNotificationTitle'),
       message: browser.i18n.getMessage('welcomeNotificationMessage'),
     })
-
-    browser
-      .storage.local.set({
-        [storageKey]: { token: token },
-      })
-      .then(() => initialize(token))
   }
+
+  return boot(token)
 }
 
-function initialize(token) {
-  function startDownload(link) {
+function validateTokenFailure(error) {
+  console.error('PutioWebExtension - Token validation failed: ', error)
+  return startAuthFlow()
+}
+
+function boot(token) {
+  function startTransfer(link) {
     browser.notifications.create('transfer-start', {
       type: 'basic',
       iconUrl: notificationIcon,
@@ -67,61 +80,70 @@ function initialize(token) {
       message: browser.i18n.getMessage('transferStartNotificationMessage'),
     })
 
-    var url = apiURL + '/transfers/add'
-
-    var data = JSON.stringify({
-      url: link,
+    fetch(apiURL + '/transfers/add', {
+      method: 'POST',
+      body: JSON.stringify({ url: link }),
+      headers: {
+        Authorization: 'token ' + token,
+        'content-type': 'application/json; charset=utf-8',
+      },
     })
+      .then(function (response) {
+        if (response.ok) {
+          return startTransferSuccess()
+        }
 
-    var xhr = new XMLHttpRequest()
+        return startTransferFailure(response)
+      })
+      .catch(startTransferFailure)
+  }
 
-    xhr.open('POST', url, true)
-    xhr.setRequestHeader('Content-type','application/json; charset=utf-8')
-    xhr.setRequestHeader('authorization', 'token ' + token)
+  function startTransferSuccess() {
+    console.log('PutioWebExtension - Transfer started!')
+  }
 
-    xhr.onload = function () {
-      if (!xhr.readyState == 4) {
-        const response = JSON.parse(xhr.responseText)
+  function startTransferFailure(error) {
+    console.error('PutioWebExtension - Transfer failed: ', error)
 
-        browser.notifications.create('transfer-start-failure', {
-          type: 'basic',
-          iconUrl: notificationIcon,
-          title: browser.i18n.getMessage('transferFailureNotificationTitle'),
-          message: browser.i18n.getMessage('transferFailureNotificationMessage'),
-        })
-      }
-    }
-
-    xhr.send(data)
+    browser.notifications.create('transfer-start-failure', {
+      type: 'basic',
+      iconUrl: notificationIcon,
+      title: browser.i18n.getMessage('transferFailureNotificationTitle'),
+      message: browser.i18n.getMessage('transferFailureNotificationMessage'),
+    })
   }
 
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadMenuItem'),
     contexts: ['link'],
-    onclick: function(info, tab) {
-      startDownload(info.linkUrl)
-    }
+    onclick: function (info, tab) {
+      startTransfer(info.linkUrl)
+    },
   })
 
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadPageMenuItem'),
-    contexts: ["page"],
-    onclick: function(info, tab) {
-      startDownload(tab.url)
-    }
+    contexts: ['page'],
+    onclick: function (info, tab) {
+      startTransfer(tab.url)
+    },
   })
 
-  browser.notifications.onClicked.addListener(function(notificationId) {
+  browser.notifications.onClicked.addListener(function (notificationId) {
     if (notificationId === 'transfer-start') {
-      var url = appURL + '/transfers'
-
       browser.tabs.create({
         active: true,
-        url: url,
+        url: appURL + '/transfers',
       })
     }
 
     browser.notifications.clear(notificationId)
   })
-}
 
+  browser.browserAction.onClicked.addListener(function () {
+    browser.tabs.create({
+      active: true,
+      url: appURL,
+    })
+  })
+}
