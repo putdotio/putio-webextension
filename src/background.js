@@ -4,7 +4,7 @@ var appURL = 'https://app.put.io'
 var storageKey = 'putio-webextension'
 var notificationIcon = browser.extension.getURL('icon-notify.png')
 
-browser.storage.local.get().then((storage) => {
+browser.storage.local.get().then(storage => {
   var extensionStorage = storage[storageKey]
 
   if (!extensionStorage || !extensionStorage.token) {
@@ -41,7 +41,7 @@ function validateToken(token, options) {
       authorization: 'token ' + token,
     },
   })
-    .then(function (response) {
+    .then(function(response) {
       if (response.ok) {
         return validateTokenSuccess(token, options)
       }
@@ -53,6 +53,10 @@ function validateToken(token, options) {
 
 function validateTokenSuccess(token, options) {
   console.log('PutioWebExtension - Token validated!')
+
+  browser.storage.local.set({
+    token: token,
+  })
 
   if (options.notify) {
     browser.notifications.create('validate-success', {
@@ -88,7 +92,7 @@ function boot(token) {
         'content-type': 'application/json; charset=utf-8',
       },
     })
-      .then(function (response) {
+      .then(function(response) {
         if (response.ok) {
           return startTransferSuccess()
         }
@@ -116,7 +120,7 @@ function boot(token) {
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadMenuItem'),
     contexts: ['link'],
-    onclick: function (info, tab) {
+    onclick: function(info, tab) {
       startTransfer(info.linkUrl)
     },
   })
@@ -124,12 +128,12 @@ function boot(token) {
   browser.contextMenus.create({
     title: browser.i18n.getMessage('downloadPageMenuItem'),
     contexts: ['page'],
-    onclick: function (info, tab) {
+    onclick: function(info, tab) {
       startTransfer(tab.url)
     },
   })
 
-  browser.notifications.onClicked.addListener(function (notificationId) {
+  browser.notifications.onClicked.addListener(function(notificationId) {
     if (notificationId === 'transfer-start') {
       browser.tabs.create({
         active: true,
@@ -140,7 +144,7 @@ function boot(token) {
     browser.notifications.clear(notificationId)
   })
 
-  browser.browserAction.onClicked.addListener(function () {
+  browser.browserAction.onClicked.addListener(function() {
     browser.tabs.create({
       active: true,
       url: appURL,
