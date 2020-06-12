@@ -1,17 +1,14 @@
 var clientID = '2939'
 var apiURL = 'https://api.put.io/v2'
 var appURL = 'https://app.put.io'
-var storageKey = 'putio-webextension'
 var notificationIcon = browser.extension.getURL('icon-notify.png')
 
 browser.storage.local.get().then(storage => {
-  var extensionStorage = storage[storageKey]
-
-  if (!extensionStorage || !extensionStorage.token) {
+  if (!storage.token) {
     return startAuthFlow()
   }
 
-  return validateToken(extensionStorage.token, { notify: false })
+  return validateToken(storage.token, { notify: false })
 })
 
 function startAuthFlow() {
@@ -58,7 +55,7 @@ function validateTokenSuccess(token, options) {
     token: token,
   })
 
-  if (options.notify) {
+  if (options && options.notify) {
     browser.notifications.create('validate-success', {
       type: 'basic',
       iconUrl: notificationIcon,
