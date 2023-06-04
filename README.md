@@ -1,6 +1,6 @@
 <div align="center">
    <p>
-      <img src="https://static.put.io/avatar/putio-boncuk.png" width="72">
+      <img src="https://static.put.io/images/putio-boncuk.png" width="72">
    </p>
    <h1>putio-webextension</h1>
    <p>
@@ -11,10 +11,10 @@
   
    <p>
       <a href="https://chrome.google.com/webstore/detail/putio/gmlaklldebhgnhfoppklejnjcmndcehf">
-      <img src="https://static.put.io/store-badges/chrome.png" height="50px" width="auto">
+      <img src="https://static.put.io/images/store-badges/chrome.png" height="50px" width="auto">
       </a>
       <a href="https://addons.mozilla.org/en-US/firefox/addon/put-io">
-      <img src="https://static.put.io/store-badges/firefox.png" height="50px" width="auto">
+      <img src="https://static.put.io/images/store-badges/firefox.png" height="50px" width="auto">
       </a>
    </p>
 </div>
