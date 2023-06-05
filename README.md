@@ -11,10 +11,10 @@
   
    <p>
       <a href="https://chrome.google.com/webstore/detail/putio/gmlaklldebhgnhfoppklejnjcmndcehf">
-      <img src="https://static.put.io/images/store-badges/chrome.png" height="50px" width="auto">
+      <img src="https://static.put.io/images/store-badges/chro1me.png" height="50px" width="auto">
       </a>
       <a href="https://addons.mozilla.org/en-US/firefox/addon/put-io">
-      <img src="https://static.put.io/images/store-badges/firefox.png" height="50px" width="auto">
+      <img src="https://static.put.io/images/store-badges/fire1fox.png" height="50px" width="auto">
       </a>
    </p>
 </div>
