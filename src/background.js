@@ -1,7 +1,12 @@
+// to be platform independent
+if (typeof browser === "undefined") {
+    var browser = chrome;
+}
+
 var clientID = '2939'
 var apiURL = 'https://api.put.io/v2'
 var appURL = 'https://app.put.io'
-var notificationIcon = browser.extension.getURL('icon-notify.png')
+var notificationIcon = browser.runtime.getURL('icon-notify.png')
 
 browser.storage.local.get().then(storage => {
   if (!storage.token) {
@@ -115,19 +120,24 @@ function boot(token) {
   }
 
   browser.contextMenus.create({
+    id: 'download-link',
     title: browser.i18n.getMessage('downloadMenuItem'),
     contexts: ['link'],
-    onclick: function(info, tab) {
-      startTransfer(info.linkUrl)
-    },
   })
 
   browser.contextMenus.create({
+    id: 'download-page',
     title: browser.i18n.getMessage('downloadPageMenuItem'),
     contexts: ['page'],
-    onclick: function(info, tab) {
+  })
+
+  browser.contextMenus.onClicked.addListener((item, tab) => {
+    if (item.menuItemId === 'download-link') {
+      startTransfer(item.linkUrl)
+    }
+    if (item.menuItemId === 'download-page') {
       startTransfer(tab.url)
-    },
+    }
   })
 
   browser.notifications.onClicked.addListener(function(notificationId) {
@@ -141,7 +151,7 @@ function boot(token) {
     browser.notifications.clear(notificationId)
   })
 
-  browser.browserAction.onClicked.addListener(function() {
+  browser.action.onClicked.addListener(function() {
     browser.tabs.create({
       active: true,
       url: appURL,
