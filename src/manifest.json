@@ -4,7 +4,7 @@
   "description": "__MSG_extensionDescription__",
   "version": "3.0.0",
   "default_locale": "en",
-  "applications": {
+  "browser_specific_settings": {
     "gecko": {
       "id": "{1edc8157-02d9-460b-9305-b31a5b713d9d}"
     }
@@ -27,6 +27,6 @@
     "128": "icon128.png"
   },
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
   }
 }
