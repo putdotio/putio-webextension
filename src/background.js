@@ -151,7 +151,7 @@ function boot(token) {
     browser.notifications.clear(notificationId)
   })
 
-  browser.action.onClicked.addListener(function() {
+  browser.browserAction.onClicked.addListener(function() {
     browser.tabs.create({
       active: true,
       url: appURL,
