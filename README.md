@@ -18,3 +18,16 @@
       </a>
    </p>
 </div>
+
+## Docs
+
+- [Contributing](./CONTRIBUTING.md) for source layout, validation, and review guidance
+- [Security](./SECURITY.md) for private vulnerability reporting
+
+## Repo Internals
+
+- [Agent guide](./AGENTS.md) for repo-specific automation guidance
+
+## Contributing
+
+Use [Contributing](./CONTRIBUTING.md) for the repo workflow and browser validation notes.
