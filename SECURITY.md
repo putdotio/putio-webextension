@@ -6,7 +6,7 @@ If you believe you have found a security or privacy issue in this project, pleas
 
 - email: devs@put.io
 
-Please do not open a public issue for vulnerabilities or sensitive reports.
+Use private email for vulnerabilities or sensitive reports.
 
 ## Scope
 
@@ -20,8 +20,8 @@ Useful reports usually include issues involving:
 ## Guidelines
 
 - test only against accounts, environments, and data you control
-- avoid destructive behavior, service disruption, or automated high-volume testing
-- do not attempt social engineering, physical attacks, or denial-of-service testing
+- keep testing non-destructive, low-volume, and limited to systems you control
+- keep reports focused on technical vulnerabilities in this repository
 
 ## Supported Versions
 
