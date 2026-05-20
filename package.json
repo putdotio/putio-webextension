@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/putdotio/putio-webextension#readme",
   "devDependencies": {
-    "@putdotio/prettier-config": "^1.0.0",
-    "prettier": "^1.19.1"
+    "@putdotio/prettier-config": "^2.0.0",
+    "prettier": "^3.8.3"
   }
 }
