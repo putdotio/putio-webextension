@@ -10,12 +10,7 @@
     }
   },
   "homepage_url": "https://github.com/putdotio/putio-webextension",
-  "permissions": [
-    "contextMenus",
-    "identity",
-    "storage",
-    "notifications"
-  ],
+  "permissions": ["contextMenus", "identity", "storage", "notifications"],
   "browser_action": {
     "default_icon": "icon.png"
   },

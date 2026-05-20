@@ -6,9 +6,9 @@ updates:
       interval: weekly
       day: monday
     groups:
-      npm-patch-minor:
+      package-patch-minor:
         update-types: ["patch", "minor"]
-      npm-major:
+      package-major:
         update-types: ["major"]
     commit-message:
       prefix: "chore"

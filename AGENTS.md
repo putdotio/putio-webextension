@@ -14,8 +14,9 @@
 
 ## Commands
 
-- `npm install`
-- `npx prettier --check README.md src/background.js src/manifest.chrome.json src/manifest.firefox.json`
+- `pnpm install`
+- `pnpm run check`
+- `pnpm run format`
 
 ## Repo-Specific Guidance
 
@@ -26,5 +27,6 @@
 
 ## Validation
 
-- Run the Prettier check when changing the README, manifests, or background script
+- Run `pnpm run check` when changing docs, manifests, locale messages, or the background script
 - Manually load the unpacked extension from `src/` in the affected browser when behavior changes
+- CI runs the same check on pull requests and `main`

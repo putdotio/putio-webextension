@@ -7,7 +7,7 @@ This repository contains the standalone browser extension for put.io.
 Install dependencies from the repository root:
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## Local Testing
@@ -22,15 +22,17 @@ This repo does not build artifacts. Load the unpacked extension directly from `s
 Before opening a pull request:
 
 ```bash
-npx prettier --check README.md src/background.js src/manifest.chrome.json src/manifest.firefox.json
+pnpm run check
 ```
 
 If the change affects runtime behavior, manually exercise the right-click flow in the affected browser.
+CI runs the same check on pull requests and `main`.
 
 ## Development Notes
 
 - Keep end-user install and usage copy in [Overview](./README.md)
 - Keep repo rules in [Agent guide](./AGENTS.md)
+- Use `pnpm run format` to apply the Vite+ formatter before committing
 - Keep security reporting in [Security](./SECURITY.md)
 
 ## Pull Requests
