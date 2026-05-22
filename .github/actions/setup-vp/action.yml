@@ -1,0 +1,29 @@
+name: Setup Vite+
+description: Set up the repo-pinned Vite+ runtime
+
+inputs:
+  node-version-file:
+    description: Node version file to pass to setup-vp
+    required: false
+    default: .node-version
+  cache:
+    description: Restore and save package-manager dependencies for this job
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Read Vite+ version
+      id: versions
+      shell: bash
+      run: |
+        version=$(jq -er '.devDependencies["vite-plus"] | sub("^[~^]"; "")' package.json)
+        echo "vite-plus-version=${version}" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Vite+
+      uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
+      with:
+        version: ${{ steps.versions.outputs.vite-plus-version }}
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: ${{ inputs.cache }}
