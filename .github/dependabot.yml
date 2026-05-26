@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 1
     groups:
       package-patch-minor:
         update-types: ["patch", "minor"]
