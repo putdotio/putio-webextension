@@ -19,8 +19,8 @@
     "format": "vp check --fix ."
   },
   "devDependencies": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.1",
-    "vite-plus": "^0.2.2"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=24.14.0"
