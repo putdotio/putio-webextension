@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "vite": "catalog:",
-    "vite-plus": "0.2.7"
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=24.18.0"
