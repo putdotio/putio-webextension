@@ -6,9 +6,9 @@
    <p>
       Download links to put.io with right-click in browsers.
    </p>
-  
-  <img src="./screenshots/usage.gif" width="75%"><br>
-  
+
+<img src="./screenshots/usage.gif" width="75%"><br>
+
    <p>
       <a href="https://chrome.google.com/webstore/detail/putio/gmlaklldebhgnhfoppklejnjcmndcehf">
       <img src="https://static.put.io/images/store-badges/chrome.png" height="50px" width="auto">
