@@ -37,3 +37,6 @@ jobs:
 
       - name: Verify extension
         run: vp run check
+
+      - name: Build extension packages
+        run: vp run build

@@ -1,6 +1,6 @@
 {
   "name": "putio-webextension",
-  "version": "2.3.3",
+  "version": "3.1.0",
   "description": "Download links to put.io with right-click in browsers",
   "keywords": [],
   "homepage": "https://github.com/putdotio/putio-webextension#readme",
@@ -15,6 +15,7 @@
   },
   "main": "src/background.js",
   "scripts": {
+    "build": "node scripts/build.mjs",
     "check": "vp check .",
     "format": "vp check --fix ."
   },
