@@ -5,6 +5,9 @@
 // package.json `version` is the single version source; it is stamped into
 // each emitted manifest.json here. The tracked src/manifest.*.json files
 // intentionally carry no version field.
+//
+// Requires the external `zip` binary on PATH (preinstalled on macOS and
+// ubuntu-latest CI runners).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -44,6 +47,11 @@ for (const browser of browsers) {
     cwd: outDir,
     stdio: "inherit",
   });
+
+  if (zip.error?.code === "ENOENT") {
+    console.error("`zip` binary not found on PATH; install it and re-run `pnpm run build`");
+    process.exit(1);
+  }
 
   if (zip.error || zip.status !== 0) {
     console.error(`zip failed for ${browser}:`, zip.error ?? `exit ${zip.status}`);

@@ -120,7 +120,15 @@ function startAuthFlow() {
 }
 
 function handleAuthCallback(redirectURL) {
-  var token = redirectURL.split("#access_token=")[1];
+  // Cancellation rejects the promise (handled by the caller's catch); this
+  // guards a completed flow whose redirect carries no access token.
+  var token = redirectURL && redirectURL.split("#access_token=")[1];
+
+  if (!token) {
+    console.error("PutioWebExtension - Auth flow returned no access token");
+    return;
+  }
+
   return validateToken(token, { notify: true });
 }
 
