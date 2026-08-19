@@ -12,10 +12,20 @@ pnpm install
 
 ## Local Testing
 
-This repo does not build artifacts. Load the unpacked extension directly from `src/`.
+Build the per-browser directories first:
 
-- Chrome: load `src/manifest.chrome.json` through the unpacked-extension flow
-- Firefox: load `src/manifest.firefox.json` through temporary add-on loading
+```bash
+pnpm run build
+```
+
+This emits `dist/chrome/` and `dist/firefox/` (each with a `manifest.json`) plus a store
+zip per browser under `dist/`.
+
+- Chrome: `chrome://extensions` → enable Developer mode → Load unpacked → select `dist/chrome/`
+- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `dist/firefox/manifest.json`
+
+`package.json` `version` is the single version source; the build stamps it into each
+emitted `manifest.json`. Do not add a `version` field to `src/manifest.*.json`.
 
 ## Validation
 
