@@ -2,13 +2,22 @@
   "name": "putio-webextension",
   "version": "3.1.0",
   "description": "Download links to put.io with right-click in browsers",
-  "keywords": [],
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "context-menu",
+    "download",
+    "firefox-addon",
+    "put.io",
+    "putio",
+    "webextension"
+  ],
   "homepage": "https://github.com/putdotio/putio-webextension#readme",
   "bugs": {
     "url": "https://github.com/putdotio/putio-webextension/issues"
   },
-  "license": "ISC",
-  "author": "",
+  "license": "MIT",
+  "author": "put.io <devs@put.io>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/putdotio/putio-webextension.git"
