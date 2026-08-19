@@ -19,7 +19,8 @@ pnpm run build
 ```
 
 This emits `dist/chrome/` and `dist/firefox/` (each with a `manifest.json`) plus a store
-zip per browser under `dist/`.
+zip per browser under `dist/`. Zipping requires the external `zip` binary on PATH
+(preinstalled on macOS and the Ubuntu CI runners).
 
 - Chrome: `chrome://extensions` → enable Developer mode → Load unpacked → select `dist/chrome/`
 - Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `dist/firefox/manifest.json`
@@ -33,10 +34,12 @@ Before opening a pull request:
 
 ```bash
 pnpm run check
+pnpm run build
 ```
 
-If the change affects runtime behavior, manually exercise the right-click flow in the affected browser.
-CI runs the same check on pull requests and `main`.
+If the change affects runtime behavior, load the built extension from `dist/` and manually
+exercise the right-click flow in the affected browser.
+CI runs the same check and build on pull requests and `main`.
 
 ## Development Notes
 
