@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an improvement to the put.io browser extension.
+title: ""
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: State the outcome you need, not the proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround
+      description: How you solve this today, if at all.
