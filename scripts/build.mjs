@@ -7,7 +7,7 @@
 // intentionally carry no version field.
 //
 // Requires the external `zip` binary on PATH (preinstalled on macOS and
-// ubuntu-latest CI runners).
+// Blacksmith Ubuntu CI runners).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

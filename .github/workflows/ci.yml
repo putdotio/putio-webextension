@@ -12,7 +12,7 @@ jobs:
   verify:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify extension
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     concurrency:
       group: verify-${{ github.workflow }}-${{ github.ref }}
