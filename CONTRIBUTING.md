@@ -64,8 +64,9 @@ successful sign-in sends that link once. Try cancellation, a second click during
 and an expired credential. Temporary validation failures must not open repeated sign-in
 windows or discard an existing credential.
 
-The background script retains at most one selected link while recovering. Additional clicks
-leave it unchanged. Success, cancellation, and terminal failure clear it; abandoned records
+Ordinary signed-in downloads can run concurrently. The background script retains at most one
+selected link when authentication is needed; additional clicks during that recovery leave it
+unchanged. Success, cancellation, and terminal failure clear it; abandoned records
 expire before the next selected action after 15 minutes. A worker interrupted during a transfer POST
 cannot know whether the transfer started, so its notification opens the transfers page for
 checking and clears the saved action. It never automatically sends that uncertain request again.

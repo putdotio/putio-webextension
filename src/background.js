@@ -34,8 +34,8 @@ browser.contextMenus.onClicked.addListener(function (item, tab) {
     return;
   }
 
-  return runOperation(function () {
-    return selectTransfer(link);
+  return sendSelectedLink(link).catch(function () {
+    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
   });
 });
 
@@ -43,14 +43,12 @@ browser.notifications.onClicked.addListener(function (notificationId) {
   browser.notifications.clear(notificationId);
   if (notificationId === "transfer-start" || notificationId === "transfer-uncertain") {
     browser.tabs.create({ active: true, url: appURL + "/transfers" });
-    if (notificationId === "transfer-uncertain") {
-      return runOperation(async function () {
-        var pending = await getPendingTransfer();
-        if (pending && pending.phase !== "ready") {
-          await browser.storage.local.remove("pendingTransfer");
-        }
-      });
-    }
+    return runOperation(async function () {
+      var pending = await getPendingTransfer();
+      if (pending && pending.phase !== "ready") {
+        await browser.storage.local.remove("pendingTransfer");
+      }
+    });
   }
   if (notificationId === "auth-retry") {
     return runOperation(resumeTransfer);
@@ -80,11 +78,13 @@ async function initialize() {
       if (currentToken === token && generation === operationGeneration && !activeOperation) {
         await browser.storage.local.remove("token");
       }
-    } else if (result === "unavailable") {
+    } else if (result === "unavailable" && generation === operationGeneration && !activeOperation) {
       notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
     }
   } catch {
-    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    if (generation === operationGeneration && !activeOperation) {
+      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    }
   }
 }
 
@@ -121,6 +121,36 @@ function getToken() {
 var activeOperation = null;
 var operationGeneration = 0;
 var pendingMaxAge = 15 * 60 * 1000;
+
+async function sendSelectedLink(link) {
+  operationGeneration += 1;
+  var token = await getToken();
+  var pending = (await browser.storage.local.get("pendingTransfer")).pendingTransfer;
+  if (!token || pending || activeOperation) {
+    return runOperation(function () {
+      return selectTransfer(link);
+    });
+  }
+
+  // Signed-in downloads can overlap, as before. Only a link needing auth
+  // recovery owns the durable slot; ordinary POSTs are never replayed.
+  var response = await startTransfer(token, link);
+  if (response && response.status === 401) {
+    return runOperation(async function () {
+      if ((await getToken()) === token) await browser.storage.local.remove("token");
+      return selectTransfer(link);
+    });
+  }
+  if (!response || response.status >= 500) {
+    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+  } else if (!response.ok) {
+    notify(
+      "transfer-start-failure",
+      "transferFailureNotificationTitle",
+      "transferFailureNotificationMessage",
+    );
+  }
+}
 
 function runOperation(operation) {
   if (activeOperation) {
@@ -259,7 +289,9 @@ async function startAuthFlow() {
   if (!token) return { state: "rejected" };
   var result = await validateToken(token);
   if (result !== "ready") {
-    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    if (result === "unavailable") {
+      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    }
     return { state: result };
   }
   await browser.storage.local.set({ token: token });

@@ -251,10 +251,10 @@ for (const transfer of [
   },
 ]) {
   test("ambiguous transfer failures retain an uncertain action and never reauthenticate", async () => {
-    const app = createHarness({ state: { token: "existing" }, transfer });
+    const app = createHarness({ transfer });
     await app.click();
     assert.equal(app.calls.transfers.length, 1);
-    assert.equal(app.calls.auth, 0);
+    assert.equal(app.calls.auth, 1);
     assert.equal(app.state.pendingTransfer.phase, "uncertain");
   });
 }
@@ -321,4 +321,79 @@ test("slow startup validation neither blocks a selected link nor removes its new
   assert.equal(app.state.token, "new-token");
   assert.equal(app.calls.transfers.length, 2);
   assert.equal(app.calls.auth, 1);
+});
+
+test("signed-in links can start while an earlier transfer is still pending", async () => {
+  let finishFirst;
+  const pending = new Promise((resolve) => {
+    finishFirst = resolve;
+  });
+  const app = createHarness({
+    state: { token: "existing" },
+    transfer: (request) => (request.url === link ? pending : response(200)),
+  });
+  const first = app.click();
+  await new Promise(setImmediate);
+  const second = app.click("https://example.invalid/other.torrent");
+  await new Promise(setImmediate);
+  try {
+    assert.deepEqual(
+      app.calls.transfers.map((request) => request.url),
+      [link, "https://example.invalid/other.torrent"],
+    );
+    assert.equal(app.calls.auth, 0);
+  } finally {
+    finishFirst(response(200));
+    await Promise.all([first, second]);
+  }
+});
+
+test("rejected auth validation offers only terminal recovery", async () => {
+  const app = createHarness({ validate: () => response(401) });
+  await app.click();
+  assert.equal(app.state.pendingTransfer, undefined);
+  assert.equal(app.calls.transfers.length, 0);
+  assert.ok(app.calls.notifications.some((notice) => notice.id === "auth-cancelled"));
+  assert.equal(
+    app.calls.notifications.some((notice) => notice.id === "auth-retry"),
+    false,
+  );
+});
+
+for (const failure of [response(503), new Error("offline")]) {
+  test("late startup failure does not contradict a completed transfer", async () => {
+    let finishValidation;
+    const pending = new Promise((resolve, reject) => {
+      finishValidation = () => (failure instanceof Error ? reject(failure) : resolve(failure));
+    });
+    const app = createHarness({ state: { token: "existing" }, validate: () => pending });
+    const startup = app.startup();
+    await new Promise(setImmediate);
+    await app.click();
+    finishValidation();
+    await startup;
+    assert.equal(app.calls.transfers.length, 1);
+    assert.equal(
+      app.calls.notifications.some((notice) => notice.title === "authUnavailableTitle"),
+      false,
+    );
+  });
+}
+
+test("a worker woken by the start notification clears its interrupted send without replay", async () => {
+  const app = createHarness({
+    state: {
+      token: "existing",
+      pendingTransfer: { link, phase: "sending", createdAt: Date.now() },
+    },
+  });
+  await app.notification("transfer-start");
+  assert.equal(app.calls.tabs[0].url, "https://app.put.io/transfers");
+  assert.equal(app.state.pendingTransfer, undefined);
+  assert.equal(app.calls.transfers.length, 0);
+  await app.click("https://example.invalid/next.torrent");
+  assert.deepEqual(
+    app.calls.transfers.map((request) => request.url),
+    ["https://example.invalid/next.torrent"],
+  );
 });
