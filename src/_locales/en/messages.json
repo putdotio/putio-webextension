@@ -40,27 +40,35 @@
     "description": "Description of the transfer failure notification"
   },
   "authUnavailableTitle": {
-    "message": "put.io is temporarily unavailable"
+    "message": "put.io is temporarily unavailable",
+    "description": "Notification title when sign-in validation cannot reach the service."
   },
   "authUnavailableMessage": {
-    "message": "We could not check your sign-in. Try again in a few minutes."
+    "message": "We could not check your sign-in. Try again in a few minutes.",
+    "description": "Recovery text after a temporary validation failure; stored credentials are retained."
   },
   "pendingTransferTitle": {
-    "message": "Finish your saved download"
+    "message": "Finish your saved download",
+    "description": "Notification title for the single link saved while sign-in is pending."
   },
   "pendingTransferMessage": {
-    "message": "A link is already waiting. Click to retry that link before choosing another."
+    "message": "A link is already waiting. Click to retry that link before choosing another.",
+    "description": "Clicking this notification retries the saved link; a new link has not replaced it."
   },
   "authCancelledTitle": {
-    "message": "Sign-in was not completed"
+    "message": "Sign-in was not completed",
+    "description": "Notification title after cancelled, rejected, or exhausted sign-in."
   },
   "authCancelledMessage": {
-    "message": "No transfer was started. Use the context menu to try again."
+    "message": "No transfer was started. Use the context menu to try again.",
+    "description": "The saved action was cleared without starting a transfer; choose the link again to retry."
   },
   "transferUncertainTitle": {
-    "message": "Check your transfers"
+    "message": "Check your transfers",
+    "description": "Notification title when the server may have accepted the download request."
   },
   "transferUncertainMessage": {
-    "message": "This download may already have started. Click to check your transfers before trying again."
+    "message": "This download may already have started. Click to check your transfers before trying again.",
+    "description": "Clicking opens transfers for inspection; the extension will not automatically resend this request."
   }
 }
