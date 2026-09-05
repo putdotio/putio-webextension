@@ -34,24 +34,27 @@ browser.contextMenus.onClicked.addListener(function (item, tab) {
     return;
   }
 
-  getToken().then(function (token) {
-    if (!token) {
-      return startAuthFlow();
-    }
-
-    return startTransfer(token, link);
+  return runOperation(function () {
+    return selectTransfer(link);
   });
 });
 
 browser.notifications.onClicked.addListener(function (notificationId) {
-  if (notificationId === "transfer-start") {
-    browser.tabs.create({
-      active: true,
-      url: appURL + "/transfers",
-    });
-  }
-
   browser.notifications.clear(notificationId);
+  if (notificationId === "transfer-start" || notificationId === "transfer-uncertain") {
+    browser.tabs.create({ active: true, url: appURL + "/transfers" });
+    if (notificationId === "transfer-uncertain") {
+      return runOperation(async function () {
+        var pending = await getPendingTransfer();
+        if (pending && pending.phase !== "ready") {
+          await browser.storage.local.remove("pendingTransfer");
+        }
+      });
+    }
+  }
+  if (notificationId === "auth-retry") {
+    return runOperation(resumeTransfer);
+  }
 });
 
 toolbarAction.onClicked.addListener(function () {
@@ -61,16 +64,28 @@ toolbarAction.onClicked.addListener(function () {
   });
 });
 
-function initialize() {
+async function initialize() {
   createContextMenus();
-
-  getToken().then(function (token) {
-    if (!token) {
-      return startAuthFlow();
+  var generation = operationGeneration;
+  try {
+    var pending = await getPendingTransfer(false);
+    if (pending) notifyPending(pending);
+    var token = await getToken();
+    if (!token) return;
+    var result = await validateToken(token);
+    // Startup validation must not block a click or invalidate a credential
+    // obtained by a user operation while this request was in flight.
+    if (result === "rejected" && generation === operationGeneration && !activeOperation) {
+      var currentToken = await getToken();
+      if (currentToken === token && generation === operationGeneration && !activeOperation) {
+        await browser.storage.local.remove("token");
+      }
+    } else if (result === "unavailable") {
+      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
     }
-
-    return validateToken(token, { notify: false });
-  });
+  } catch {
+    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+  }
 }
 
 function createContextMenus() {
@@ -101,103 +116,183 @@ function getToken() {
   });
 }
 
-function startAuthFlow() {
+// The promise serializes this worker only. The selected link and send phase are
+// durable, so restarting an MV3 worker cannot replay an uncertain POST.
+var activeOperation = null;
+var operationGeneration = 0;
+var pendingMaxAge = 15 * 60 * 1000;
+
+function runOperation(operation) {
+  if (activeOperation) {
+    notify("auth-retry", "pendingTransferTitle", "pendingTransferMessage");
+    return activeOperation;
+  }
+  operationGeneration += 1;
+  activeOperation = Promise.resolve()
+    .then(operation)
+    .catch(function () {
+      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    })
+    .finally(function () {
+      activeOperation = null;
+    });
+  return activeOperation;
+}
+
+async function getPendingTransfer(clearExpired = true) {
+  var storage = await browser.storage.local.get("pendingTransfer");
+  var pending = storage.pendingTransfer;
+  if (!pending) return null;
+  if (
+    typeof pending.link !== "string" ||
+    !pending.link ||
+    !Number.isFinite(pending.createdAt) ||
+    Date.now() - pending.createdAt > pendingMaxAge ||
+    ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0
+  ) {
+    if (clearExpired) await browser.storage.local.remove("pendingTransfer");
+    return null;
+  }
+  return pending;
+}
+
+function savePendingTransfer(pending, phase) {
+  return browser.storage.local.set({
+    pendingTransfer: { link: pending.link, createdAt: pending.createdAt, phase: phase },
+  });
+}
+
+function notifyPending(pending) {
+  if (pending.phase === "ready") {
+    notify("auth-retry", "pendingTransferTitle", "pendingTransferMessage");
+  } else {
+    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+  }
+}
+
+async function selectTransfer(link) {
+  var pending = await getPendingTransfer();
+  if (pending && (pending.link !== link || pending.phase !== "ready")) {
+    notifyPending(pending);
+    return;
+  }
+  if (!pending) {
+    await savePendingTransfer({ link: link, createdAt: Date.now() }, "ready");
+  }
+  return resumeTransfer();
+}
+
+async function resumeTransfer() {
+  var pending = await getPendingTransfer();
+  if (!pending) return;
+  if (pending.phase !== "ready") {
+    notifyPending(pending);
+    return;
+  }
+  var token = await getToken();
+  var authenticated = false;
+  while (true) {
+    if (!token) {
+      if (authenticated) {
+        await browser.storage.local.remove("pendingTransfer");
+        notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
+        return;
+      }
+      authenticated = true;
+      var auth = await startAuthFlow();
+      if (auth.state === "cancelled" || auth.state === "rejected") {
+        await browser.storage.local.remove("pendingTransfer");
+        notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
+        return;
+      }
+      if (auth.state !== "ready") return;
+      token = auth.token;
+    }
+
+    // A terminated worker cannot tell whether this POST was accepted. Persist
+    // before sending, and require the user to check transfers after a restart.
+    await savePendingTransfer(pending, "sending");
+    var response = await startTransfer(token, pending.link);
+    if (response && response.ok) {
+      await browser.storage.local.remove("pendingTransfer");
+      return;
+    }
+    if (response && response.status === 401) {
+      await savePendingTransfer(pending, "ready");
+      await browser.storage.local.remove("token");
+      token = null;
+      continue;
+    }
+    if (!response || response.status >= 500) {
+      await savePendingTransfer(pending, "uncertain");
+      notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+    } else {
+      await browser.storage.local.remove("pendingTransfer");
+      notify(
+        "transfer-start-failure",
+        "transferFailureNotificationTitle",
+        "transferFailureNotificationMessage",
+      );
+    }
+    return;
+  }
+}
+
+async function startAuthFlow() {
   var redirectURL = browser.identity.getRedirectURL();
   var authURL = apiURL + "/oauth2/authenticate";
   authURL += "?client_id=" + clientID;
   authURL += "&response_type=token";
   authURL += "&redirect_uri=" + encodeURIComponent(redirectURL);
+  var callback;
+  try {
+    callback = await browser.identity.launchWebAuthFlow({ interactive: true, url: authURL });
+  } catch {
+    return { state: "cancelled" };
+  }
+  var token;
+  try {
+    token = new URLSearchParams(new URL(callback).hash.slice(1)).get("access_token");
+  } catch {
+    return { state: "rejected" };
+  }
+  if (!token) return { state: "rejected" };
+  var result = await validateToken(token);
+  if (result !== "ready") {
+    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    return { state: result };
+  }
+  await browser.storage.local.set({ token: token });
+  notify("validate-success", "welcomeNotificationTitle", "welcomeNotificationMessage");
+  return { state: "ready", token: token };
+}
 
-  return browser.identity
-    .launchWebAuthFlow({
-      interactive: true,
-      url: authURL,
-    })
-    .then(handleAuthCallback)
-    .catch(function (error) {
-      console.error("PutioWebExtension - Auth flow failed: ", error);
+async function validateToken(token) {
+  try {
+    var response = await fetch(apiURL + "/oauth2/validate", {
+      headers: { authorization: "token " + token },
     });
-}
-
-function handleAuthCallback(redirectURL) {
-  // Cancellation rejects the promise (handled by the caller's catch); this
-  // guards a completed flow whose redirect carries no access token.
-  var token = redirectURL && redirectURL.split("#access_token=")[1];
-
-  if (!token) {
-    console.error("PutioWebExtension - Auth flow returned no access token");
-    return;
-  }
-
-  return validateToken(token, { notify: true });
-}
-
-function validateToken(token, options) {
-  return fetch(apiURL + "/oauth2/validate", {
-    headers: {
-      authorization: "token " + token,
-    },
-  })
-    .then(function (response) {
-      if (response.ok) {
-        return validateTokenSuccess(token, options);
-      }
-
-      return validateTokenFailure(response);
-    })
-    .catch(validateTokenFailure);
-}
-
-function validateTokenSuccess(token, options) {
-  console.log("PutioWebExtension - Token validated!");
-
-  browser.storage.local.set({
-    token: token,
-  });
-
-  if (options && options.notify) {
-    notify("validate-success", "welcomeNotificationTitle", "welcomeNotificationMessage");
+    if (response.ok) return "ready";
+    return response.status === 401 ? "rejected" : "unavailable";
+  } catch {
+    return "unavailable";
   }
 }
 
-function validateTokenFailure(error) {
-  console.error("PutioWebExtension - Token validation failed: ", error);
-  return startAuthFlow();
-}
-
-function startTransfer(token, link) {
+async function startTransfer(token, link) {
   notify("transfer-start", "transferStartNotificationTitle", "transferStartNotificationMessage");
-
-  return fetch(apiURL + "/transfers/add", {
-    method: "POST",
-    body: JSON.stringify({ url: link }),
-    headers: {
-      Authorization: "token " + token,
-      "content-type": "application/json; charset=utf-8",
-    },
-  })
-    .then(function (response) {
-      if (response.ok) {
-        return startTransferSuccess();
-      }
-
-      return startTransferFailure(response);
-    })
-    .catch(startTransferFailure);
-}
-
-function startTransferSuccess() {
-  console.log("PutioWebExtension - Transfer started!");
-}
-
-function startTransferFailure(error) {
-  console.error("PutioWebExtension - Transfer failed: ", error);
-
-  notify(
-    "transfer-start-failure",
-    "transferFailureNotificationTitle",
-    "transferFailureNotificationMessage",
-  );
+  try {
+    return await fetch(apiURL + "/transfers/add", {
+      method: "POST",
+      body: JSON.stringify({ url: link }),
+      headers: {
+        Authorization: "token " + token,
+        "content-type": "application/json; charset=utf-8",
+      },
+    });
+  } catch {
+    return null;
+  }
 }
 
 function notify(id, titleKey, messageKey) {

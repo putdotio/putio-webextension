@@ -38,5 +38,29 @@
   "transferFailureNotificationMessage": {
     "message": "We are unable to download that :-/",
     "description": "Description of the transfer failure notification"
+  },
+  "authUnavailableTitle": {
+    "message": "put.io is temporarily unavailable"
+  },
+  "authUnavailableMessage": {
+    "message": "We could not check your sign-in. Try again in a few minutes."
+  },
+  "pendingTransferTitle": {
+    "message": "Finish your saved download"
+  },
+  "pendingTransferMessage": {
+    "message": "A link is already waiting. Click to retry that link before choosing another."
+  },
+  "authCancelledTitle": {
+    "message": "Sign-in was not completed"
+  },
+  "authCancelledMessage": {
+    "message": "No transfer was started. Use the context menu to try again."
+  },
+  "transferUncertainTitle": {
+    "message": "Check your transfers"
+  },
+  "transferUncertainMessage": {
+    "message": "This download may already have started. Click to check your transfers before trying again."
   }
 }
