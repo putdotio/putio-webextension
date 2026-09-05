@@ -194,7 +194,9 @@ function getPendingTransfer(clearExpired = true) {
       !pending.link ||
       !Number.isFinite(pending.createdAt) ||
       Date.now() - pending.createdAt > pendingMaxAge ||
-      ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0
+      ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0 ||
+      (pending.provisionalToken !== undefined &&
+        (typeof pending.provisionalToken !== "string" || !pending.provisionalToken))
     ) {
       if (clearExpired) await browser.storage.local.remove("pendingTransfer");
       return null;
@@ -206,7 +208,14 @@ function getPendingTransfer(clearExpired = true) {
 function savePendingTransfer(pending, phase) {
   return updatePendingStorage(function () {
     return browser.storage.local.set({
-      pendingTransfer: { link: pending.link, createdAt: pending.createdAt, phase: phase },
+      pendingTransfer: {
+        link: pending.link,
+        createdAt: pending.createdAt,
+        phase: phase,
+        ...(phase === "ready" && pending.provisionalToken
+          ? { provisionalToken: pending.provisionalToken }
+          : {}),
+      },
     });
   });
 }
@@ -248,7 +257,9 @@ async function resumeTransfer() {
         return;
       }
       authenticated = true;
-      var auth = await startAuthFlow();
+      var auth = pending.provisionalToken
+        ? await validateAuthToken(pending.provisionalToken)
+        : await startAuthFlow(pending);
       if (auth.state === "cancelled" || auth.state === "rejected") {
         await clearPendingTransfer();
         notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
@@ -287,7 +298,7 @@ async function resumeTransfer() {
   }
 }
 
-async function startAuthFlow() {
+async function startAuthFlow(pending) {
   var redirectURL = browser.identity.getRedirectURL();
   var authURL = apiURL + "/oauth2/authenticate";
   authURL += "?client_id=" + clientID;
@@ -306,6 +317,13 @@ async function startAuthFlow() {
     return { state: "rejected" };
   }
   if (!token) return { state: "rejected" };
+  // A temporary validation outage must not require repeating interactive OAuth.
+  // The provisional credential expires and clears with this one saved action.
+  await savePendingTransfer({ ...pending, provisionalToken: token }, "ready");
+  return validateAuthToken(token);
+}
+
+async function validateAuthToken(token) {
   var result = await validateToken(token);
   if (result !== "ready") {
     if (result === "unavailable") {

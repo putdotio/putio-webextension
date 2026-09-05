@@ -62,7 +62,10 @@ CI runs the same check and build on pull requests and `main`.
 With an isolated test browser profile, select a link while signed out and confirm that
 successful sign-in sends that link once. Try cancellation, a second click during sign-in,
 and an expired credential. Temporary validation failures must not open repeated sign-in
-windows or discard an existing credential.
+windows or discard an existing credential. If validation is unavailable after OAuth,
+the saved action retains its provisional token so an explicit retry validates that token
+without reopening sign-in. The token is not used for transfers until validation succeeds;
+it clears with the saved action on rejection or expiry.
 
 Ordinary signed-in downloads can run concurrently. The background script retains at most one
 selected link when authentication is needed; additional clicks during that recovery leave it

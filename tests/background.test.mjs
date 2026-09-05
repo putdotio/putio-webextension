@@ -404,3 +404,70 @@ test("a worker woken by the start notification clears its interrupted send witho
     ["https://example.invalid/next.torrent"],
   );
 });
+
+for (const outage of [
+  () => response(503),
+  () => {
+    throw new Error("offline");
+  },
+]) {
+  test("explicit validation retries reuse the provisional OAuth token across worker restart", async () => {
+    const state = {};
+    const first = createHarness({ state, validate: outage });
+    await first.click();
+    assert.equal(first.calls.auth, 1);
+    assert.equal(state.token, undefined);
+    assert.equal(state.pendingTransfer.provisionalToken, "new-token");
+    await first.notification("auth-retry");
+    assert.equal(first.calls.auth, 1);
+    assert.equal(first.calls.validation, 2);
+    assert.equal(first.calls.transfers.length, 0);
+    const restarted = createHarness({ state });
+    await restarted.notification("auth-retry");
+    assert.equal(restarted.calls.auth, 0);
+    assert.equal(restarted.calls.validation, 1);
+    assert.deepEqual(restarted.calls.transfers, [{ url: link, token: "token new-token" }]);
+    assert.equal(state.pendingTransfer, undefined);
+  });
+}
+
+test("a rejected provisional credential clears recovery without another OAuth window", async () => {
+  const app = createHarness({
+    state: {
+      pendingTransfer: {
+        link,
+        phase: "ready",
+        createdAt: Date.now(),
+        provisionalToken: "rejected",
+      },
+    },
+    validate: () => response(401),
+  });
+  await app.notification("auth-retry");
+  assert.equal(app.calls.auth, 0);
+  assert.equal(app.calls.transfers.length, 0);
+  assert.equal(app.state.pendingTransfer, undefined);
+  assert.equal(app.state.token, undefined);
+  assert.equal(
+    app.calls.notifications.some((notice) => notice.id === "auth-retry"),
+    false,
+  );
+});
+
+test("an expired provisional credential is cleared without validation or sign-in", async () => {
+  const app = createHarness({
+    state: {
+      pendingTransfer: {
+        link,
+        phase: "ready",
+        createdAt: Date.now() - 16 * 60 * 1000,
+        provisionalToken: "expired",
+      },
+    },
+  });
+  await app.notification("auth-retry");
+  assert.equal(app.calls.auth, 0);
+  assert.equal(app.calls.validation, 0);
+  assert.equal(app.calls.transfers.length, 0);
+  assert.equal(app.state.pendingTransfer, undefined);
+});
