@@ -323,30 +323,37 @@ test("slow startup validation neither blocks a selected link nor removes its new
   assert.equal(app.calls.auth, 1);
 });
 
-test("signed-in links can start while an earlier transfer is still pending", async () => {
-  let finishFirst;
-  const pending = new Promise((resolve) => {
-    finishFirst = resolve;
+for (const expired of [false, true]) {
+  test(`signed-in links overlap after ${expired ? "expired recovery" : "ordinary selection"}`, async () => {
+    let finishFirst;
+    const pending = new Promise((resolve) => {
+      finishFirst = resolve;
+    });
+    const app = createHarness({
+      state: {
+        token: "existing",
+        ...(expired
+          ? { pendingTransfer: { link, phase: "ready", createdAt: Date.now() - 16 * 60 * 1000 } }
+          : {}),
+      },
+      transfer: (request) => (request.url === link ? pending : response(200)),
+    });
+    const first = app.click();
+    await new Promise(setImmediate);
+    const second = app.click("https://example.invalid/other.torrent");
+    await new Promise(setImmediate);
+    try {
+      assert.deepEqual(
+        app.calls.transfers.map((request) => request.url),
+        [link, "https://example.invalid/other.torrent"],
+      );
+      assert.equal(app.calls.auth, 0);
+    } finally {
+      finishFirst(response(200));
+      await Promise.all([first, second]);
+    }
   });
-  const app = createHarness({
-    state: { token: "existing" },
-    transfer: (request) => (request.url === link ? pending : response(200)),
-  });
-  const first = app.click();
-  await new Promise(setImmediate);
-  const second = app.click("https://example.invalid/other.torrent");
-  await new Promise(setImmediate);
-  try {
-    assert.deepEqual(
-      app.calls.transfers.map((request) => request.url),
-      [link, "https://example.invalid/other.torrent"],
-    );
-    assert.equal(app.calls.auth, 0);
-  } finally {
-    finishFirst(response(200));
-    await Promise.all([first, second]);
-  }
-});
+}
 
 test("rejected auth validation offers only terminal recovery", async () => {
   const app = createHarness({ validate: () => response(401) });

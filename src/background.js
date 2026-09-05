@@ -46,7 +46,7 @@ browser.notifications.onClicked.addListener(function (notificationId) {
     return runOperation(async function () {
       var pending = await getPendingTransfer();
       if (pending && pending.phase !== "ready") {
-        await browser.storage.local.remove("pendingTransfer");
+        await clearPendingTransfer();
       }
     });
   }
@@ -121,11 +121,26 @@ function getToken() {
 var activeOperation = null;
 var operationGeneration = 0;
 var pendingMaxAge = 15 * 60 * 1000;
+var pendingStorage = Promise.resolve();
+
+// Keep expiry reads/removals ordered with new recovery writes. This queue owns
+// storage operations only; it never waits for network requests or sign-in.
+function updatePendingStorage(operation) {
+  var result = pendingStorage.then(operation);
+  pendingStorage = result.catch(function () {});
+  return result;
+}
+
+function clearPendingTransfer() {
+  return updatePendingStorage(function () {
+    return browser.storage.local.remove("pendingTransfer");
+  });
+}
 
 async function sendSelectedLink(link) {
   operationGeneration += 1;
   var token = await getToken();
-  var pending = (await browser.storage.local.get("pendingTransfer")).pendingTransfer;
+  var pending = await getPendingTransfer();
   if (!token || pending || activeOperation) {
     return runOperation(function () {
       return selectTransfer(link);
@@ -169,26 +184,30 @@ function runOperation(operation) {
   return activeOperation;
 }
 
-async function getPendingTransfer(clearExpired = true) {
-  var storage = await browser.storage.local.get("pendingTransfer");
-  var pending = storage.pendingTransfer;
-  if (!pending) return null;
-  if (
-    typeof pending.link !== "string" ||
-    !pending.link ||
-    !Number.isFinite(pending.createdAt) ||
-    Date.now() - pending.createdAt > pendingMaxAge ||
-    ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0
-  ) {
-    if (clearExpired) await browser.storage.local.remove("pendingTransfer");
-    return null;
-  }
-  return pending;
+function getPendingTransfer(clearExpired = true) {
+  return updatePendingStorage(async function () {
+    var storage = await browser.storage.local.get("pendingTransfer");
+    var pending = storage.pendingTransfer;
+    if (!pending) return null;
+    if (
+      typeof pending.link !== "string" ||
+      !pending.link ||
+      !Number.isFinite(pending.createdAt) ||
+      Date.now() - pending.createdAt > pendingMaxAge ||
+      ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0
+    ) {
+      if (clearExpired) await browser.storage.local.remove("pendingTransfer");
+      return null;
+    }
+    return pending;
+  });
 }
 
 function savePendingTransfer(pending, phase) {
-  return browser.storage.local.set({
-    pendingTransfer: { link: pending.link, createdAt: pending.createdAt, phase: phase },
+  return updatePendingStorage(function () {
+    return browser.storage.local.set({
+      pendingTransfer: { link: pending.link, createdAt: pending.createdAt, phase: phase },
+    });
   });
 }
 
@@ -224,14 +243,14 @@ async function resumeTransfer() {
   while (true) {
     if (!token) {
       if (authenticated) {
-        await browser.storage.local.remove("pendingTransfer");
+        await clearPendingTransfer();
         notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
         return;
       }
       authenticated = true;
       var auth = await startAuthFlow();
       if (auth.state === "cancelled" || auth.state === "rejected") {
-        await browser.storage.local.remove("pendingTransfer");
+        await clearPendingTransfer();
         notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
         return;
       }
@@ -244,7 +263,7 @@ async function resumeTransfer() {
     await savePendingTransfer(pending, "sending");
     var response = await startTransfer(token, pending.link);
     if (response && response.ok) {
-      await browser.storage.local.remove("pendingTransfer");
+      await clearPendingTransfer();
       return;
     }
     if (response && response.status === 401) {
@@ -257,7 +276,7 @@ async function resumeTransfer() {
       await savePendingTransfer(pending, "uncertain");
       notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
     } else {
-      await browser.storage.local.remove("pendingTransfer");
+      await clearPendingTransfer();
       notify(
         "transfer-start-failure",
         "transferFailureNotificationTitle",
