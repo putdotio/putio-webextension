@@ -9,7 +9,7 @@
 ## Start Here
 
 - [Overview](./README.md)
-- [Contributing](./CONTRIBUTING.md) — setup, build output, browser load steps, and validation
+- [Contributing](./CONTRIBUTING.md): setup, build output, browser load steps, and validation
 - [Security](./SECURITY.md)
 
 ## Commands
