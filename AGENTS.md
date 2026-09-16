@@ -9,15 +9,15 @@
 ## Start Here
 
 - [Overview](./README.md)
-- [Contributing](./CONTRIBUTING.md)
+- [Contributing](./CONTRIBUTING.md) — setup, build output, browser load steps, and validation
 - [Security](./SECURITY.md)
 
 ## Commands
 
-- `pnpm install`
-- `pnpm run check`
-- `pnpm run format`
-- `pnpm run build` — emit loadable `dist/chrome/` and `dist/firefox/` plus store zips
+The `scripts` block in [package.json](./package.json) defines `pnpm run check`,
+`pnpm run format`, and `pnpm run build` (emits loadable `dist/chrome/` and
+`dist/firefox/` plus store zips). CI runs the same check and build on pull
+requests and on the `main` branch.
 
 ## Repo-Specific Guidance
 
@@ -35,7 +35,4 @@
 ## Validation
 
 - Run `pnpm run check` when changing docs, manifests, locale messages, or the background script
-- Run `pnpm run build`, then load the built extension in the affected browser when behavior changes:
-  - Chrome: `chrome://extensions` → Developer mode → Load unpacked → `dist/chrome/`
-  - Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → `dist/firefox/manifest.json`
-- CI runs the same check and build on pull requests and `main`
+- Run `pnpm run build`, then load the built extension in the affected browser when behavior changes; the load steps are in [Contributing](./CONTRIBUTING.md#local-testing)

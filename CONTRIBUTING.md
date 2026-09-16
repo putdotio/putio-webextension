@@ -25,9 +25,6 @@ zip per browser under `dist/`. Zipping requires the external `zip` binary on PAT
 - Chrome: `chrome://extensions` → enable Developer mode → Load unpacked → select `dist/chrome/`
 - Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `dist/firefox/manifest.json`
 
-`package.json` `version` is the single version source; the build stamps it into each
-emitted `manifest.json`. Do not add a `version` field to `src/manifest.*.json`.
-
 ## Validation
 
 Before opening a pull request:
@@ -44,7 +41,7 @@ CI runs the same check and build on pull requests and `main`.
 ## Development Notes
 
 - Keep end-user install and usage copy in [Overview](./README.md)
-- Keep repo rules in [Agent guide](./AGENTS.md)
+- Keep repo rules, including the version-stamping and manifest-alignment invariants, in [Agent guide](./AGENTS.md)
 - Use `pnpm run format` to apply the Vite+ formatter before committing
 - Keep security reporting in [Security](./SECURITY.md)
 

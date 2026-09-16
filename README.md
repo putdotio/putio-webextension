@@ -38,11 +38,4 @@ Right-click a supported link and send it to put.io from the browser context menu
 
 - [Contributing](./CONTRIBUTING.md) for setup, validation, and local testing
 - [Security](./SECURITY.md) for private vulnerability reporting
-
-## Repo Internals
-
 - [Agent guide](./AGENTS.md) for repo-specific automation guidance
-
-## Contributing
-
-Use [Contributing](./CONTRIBUTING.md) for contributor workflow.
