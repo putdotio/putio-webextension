@@ -37,8 +37,8 @@ pnpm run check
 pnpm run build
 ```
 
-`check` includes deterministic background-flow tests using mocked browser and HTTP boundaries.
-Use `pnpm test` for the focused suite.
+`check` runs the background-flow tests in `tests/`, which mock the browser and HTTP
+boundaries; `pnpm test` runs only those.
 
 If the change affects runtime behavior, load the built extension from `dist/` and manually
 exercise the right-click flow in the affected browser.
@@ -59,17 +59,14 @@ CI runs the same check and build on pull requests and `main`.
 
 ## Authentication recovery checks
 
-With an isolated test browser profile, select a link while signed out and confirm that
-successful sign-in sends that link once. Try cancellation, a second click during sign-in,
-and an expired credential. Temporary validation failures must not open repeated sign-in
-windows or discard an existing credential. If validation is unavailable after OAuth,
-the saved action retains its provisional token so an explicit retry validates that token
-without reopening sign-in. The token is not used for transfers until validation succeeds;
-it clears with the saved action on rejection or expiry.
+Use an isolated test browser profile. Select a link while signed out and confirm that
+completing sign-in sends that link once. Then check:
 
-Ordinary signed-in downloads can run concurrently. The background script retains at most one
-selected link when authentication is needed; additional clicks during that recovery leave it
-unchanged. Success, cancellation, and terminal failure clear it; abandoned records
-expire before the next selected action after 15 minutes. A worker interrupted during a transfer POST
-cannot know whether the transfer started, so its notification opens the transfers page for
-checking and clears the saved action. It never automatically sends that uncertain request again.
+- cancelling sign-in, or a rejected credential, clears the saved link and starts nothing
+- a second click during sign-in leaves the first link saved and shows the pending notification
+- a validation outage after OAuth keeps the saved link and its provisional token; clicking
+  the notification retries validation without reopening sign-in
+- signed-in downloads can overlap; only a link waiting on sign-in is saved, and it expires
+  after 15 minutes
+- a transfer interrupted mid-request is never resent: its notification opens the transfers
+  page and clears the saved link

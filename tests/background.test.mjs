@@ -6,6 +6,12 @@ import vm from "node:vm";
 const source = fs.readFileSync(new URL("../src/background.js", import.meta.url), "utf8");
 const link = "https://example.invalid/selected.torrent";
 const response = (status) => ({ ok: status >= 200 && status < 300, status });
+const tick = () => new Promise(setImmediate);
+const offline = () => {
+  throw new Error("offline");
+};
+const outages = { 503: () => response(503), offline };
+const expiredAt = Date.now() - 16 * 60 * 1000;
 
 function createHarness(options = {}) {
   const state = options.state ?? {};
@@ -81,15 +87,15 @@ function createHarness(options = {}) {
     calls,
     click: async (url = link) => {
       await events.menu({ menuItemId: "download-link", linkUrl: url }, {});
-      await new Promise(setImmediate);
+      await tick();
     },
     startup: async () => {
       await events.startup();
-      await new Promise(setImmediate);
+      await tick();
     },
     notification: async (id) => {
       await events.notification(id);
-      await new Promise(setImmediate);
+      await tick();
     },
   };
 }
@@ -118,7 +124,7 @@ test("does not send until token storage completes", async () => {
   });
   const app = createHarness({ beforeTokenWrite: () => gate });
   const result = app.click();
-  await new Promise(setImmediate);
+  await tick();
   assert.equal(app.calls.transfers.length, 0);
   release();
   await result;
@@ -132,7 +138,7 @@ test("a second click cannot overwrite or replay the action being authenticated",
   });
   const app = createHarness({ auth: () => auth });
   const first = app.click();
-  await new Promise(setImmediate);
+  await tick();
   const second = app.click("https://example.invalid/other.torrent");
   finishAuth("https://extension.invalid/callback#access_token=new-token");
   await Promise.all([first, second]);
@@ -167,13 +173,8 @@ test("persistent token rejection ends authentication and clears the saved action
   assert.equal(app.state.pendingTransfer, undefined);
 });
 
-for (const unavailable of [
-  () => response(503),
-  () => {
-    throw new Error("offline");
-  },
-]) {
-  test("startup validation outages retain credentials without opening authentication", async () => {
+for (const [name, unavailable] of Object.entries(outages)) {
+  test(`startup validation outage (${name}) retains credentials without opening authentication`, async () => {
     const app = createHarness({
       state: { token: "existing" },
       validate: unavailable,
@@ -186,7 +187,7 @@ for (const unavailable of [
     assert.equal(app.calls.auth, 0);
     assert.equal(app.state.token, "existing");
   });
-  test("validation failure after authentication does not recursively sign in or send", async () => {
+  test(`validation outage (${name}) after authentication does not recursively sign in or send`, async () => {
     let attempts = 0;
     const app = createHarness({
       validate: unavailable,
@@ -204,11 +205,7 @@ for (const unavailable of [
 }
 
 test("cancelling authentication clears the saved link", async () => {
-  const app = createHarness({
-    auth: () => {
-      throw new Error("cancelled");
-    },
-  });
+  const app = createHarness({ auth: offline });
   await app.click();
   assert.equal(app.state.pendingTransfer, undefined);
   assert.equal(app.calls.transfers.length, 0);
@@ -244,13 +241,8 @@ for (const phase of ["sending", "uncertain"]) {
   });
 }
 
-for (const transfer of [
-  () => response(503),
-  () => {
-    throw new Error("offline");
-  },
-]) {
-  test("ambiguous transfer failures retain an uncertain action and never reauthenticate", async () => {
+for (const [name, transfer] of Object.entries(outages)) {
+  test(`ambiguous transfer failure (${name}) retains an uncertain action and never reauthenticates`, async () => {
     const app = createHarness({ transfer });
     await app.click();
     assert.equal(app.calls.transfers.length, 1);
@@ -270,7 +262,7 @@ test("an abandoned saved link expires before another selected action", async () 
   const app = createHarness({
     state: {
       token: "existing",
-      pendingTransfer: { link, phase: "ready", createdAt: Date.now() - 16 * 60 * 1000 },
+      pendingTransfer: { link, phase: "ready", createdAt: expiredAt },
     },
   });
   await app.click("https://example.invalid/new.torrent");
@@ -314,7 +306,7 @@ test("slow startup validation neither blocks a selected link nor removes its new
     transfer: (request) => response(request.token === "token expired" ? 401 : 200),
   });
   const startup = app.startup();
-  await new Promise(setImmediate);
+  await tick();
   await app.click();
   finishValidation(response(401));
   await startup;
@@ -332,16 +324,14 @@ for (const expired of [false, true]) {
     const app = createHarness({
       state: {
         token: "existing",
-        ...(expired
-          ? { pendingTransfer: { link, phase: "ready", createdAt: Date.now() - 16 * 60 * 1000 } }
-          : {}),
+        ...(expired ? { pendingTransfer: { link, phase: "ready", createdAt: expiredAt } } : {}),
       },
       transfer: (request) => (request.url === link ? pending : response(200)),
     });
     const first = app.click();
-    await new Promise(setImmediate);
+    await tick();
     const second = app.click("https://example.invalid/other.torrent");
-    await new Promise(setImmediate);
+    await tick();
     try {
       assert.deepEqual(
         app.calls.transfers.map((request) => request.url),
@@ -367,15 +357,18 @@ test("rejected auth validation offers only terminal recovery", async () => {
   );
 });
 
-for (const failure of [response(503), new Error("offline")]) {
-  test("late startup failure does not contradict a completed transfer", async () => {
+for (const [name, failure] of Object.entries({
+  503: response(503),
+  offline: new Error("offline"),
+})) {
+  test(`late startup failure (${name}) does not contradict a completed transfer`, async () => {
     let finishValidation;
     const pending = new Promise((resolve, reject) => {
       finishValidation = () => (failure instanceof Error ? reject(failure) : resolve(failure));
     });
     const app = createHarness({ state: { token: "existing" }, validate: () => pending });
     const startup = app.startup();
-    await new Promise(setImmediate);
+    await tick();
     await app.click();
     finishValidation();
     await startup;
@@ -405,13 +398,8 @@ test("a worker woken by the start notification clears its interrupted send witho
   );
 });
 
-for (const outage of [
-  () => response(503),
-  () => {
-    throw new Error("offline");
-  },
-]) {
-  test("explicit validation retries reuse the provisional OAuth token across worker restart", async () => {
+for (const [name, outage] of Object.entries(outages)) {
+  test(`explicit validation retries (${name}) reuse the provisional OAuth token across worker restart`, async () => {
     const state = {};
     const first = createHarness({ state, validate: outage });
     await first.click();
@@ -460,7 +448,7 @@ test("an expired provisional credential is cleared without validation or sign-in
       pendingTransfer: {
         link,
         phase: "ready",
-        createdAt: Date.now() - 16 * 60 * 1000,
+        createdAt: expiredAt,
         provisionalToken: "expired",
       },
     },

@@ -34,9 +34,7 @@ browser.contextMenus.onClicked.addListener(function (item, tab) {
     return;
   }
 
-  return sendSelectedLink(link).catch(function () {
-    notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
-  });
+  return sendSelectedLink(link).catch(notifyAuthUnavailable);
 });
 
 browser.notifications.onClicked.addListener(function (notificationId) {
@@ -64,27 +62,28 @@ toolbarAction.onClicked.addListener(function () {
 
 async function initialize() {
   createContextMenus();
+  // Startup validation must not block a click or invalidate a credential
+  // obtained by a user operation while this request was in flight.
   var generation = operationGeneration;
+  var superseded = function () {
+    return generation !== operationGeneration || activeOperation !== null;
+  };
   try {
     var pending = await getPendingTransfer(false);
     if (pending) notifyPending(pending);
     var token = await getToken();
     if (!token) return;
     var result = await validateToken(token);
-    // Startup validation must not block a click or invalidate a credential
-    // obtained by a user operation while this request was in flight.
-    if (result === "rejected" && generation === operationGeneration && !activeOperation) {
-      var currentToken = await getToken();
-      if (currentToken === token && generation === operationGeneration && !activeOperation) {
+    if (superseded()) return;
+    if (result === "rejected") {
+      if ((await getToken()) === token && !superseded()) {
         await browser.storage.local.remove("token");
       }
-    } else if (result === "unavailable" && generation === operationGeneration && !activeOperation) {
-      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
+    } else if (result === "unavailable") {
+      notifyAuthUnavailable();
     }
   } catch {
-    if (generation === operationGeneration && !activeOperation) {
-      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
-    }
+    if (!superseded()) notifyAuthUnavailable();
   }
 }
 
@@ -147,24 +146,16 @@ async function sendSelectedLink(link) {
     });
   }
 
-  // Signed-in downloads can overlap, as before. Only a link needing auth
-  // recovery owns the durable slot; ordinary POSTs are never replayed.
-  var response = await startTransfer(token, link);
-  if (response && response.status === 401) {
+  // Signed-in downloads can overlap. Only a link needing auth recovery owns
+  // the durable slot; ordinary POSTs are never replayed.
+  var outcome = await startTransfer(token, link);
+  if (outcome === "rejected") {
     return runOperation(async function () {
       if ((await getToken()) === token) await browser.storage.local.remove("token");
       return selectTransfer(link);
     });
   }
-  if (!response || response.status >= 500) {
-    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
-  } else if (!response.ok) {
-    notify(
-      "transfer-start-failure",
-      "transferFailureNotificationTitle",
-      "transferFailureNotificationMessage",
-    );
-  }
+  notifyTransferOutcome(outcome);
 }
 
 function runOperation(operation) {
@@ -175,9 +166,7 @@ function runOperation(operation) {
   operationGeneration += 1;
   activeOperation = Promise.resolve()
     .then(operation)
-    .catch(function () {
-      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
-    })
+    .catch(notifyAuthUnavailable)
     .finally(function () {
       activeOperation = null;
     });
@@ -189,20 +178,24 @@ function getPendingTransfer(clearExpired = true) {
     var storage = await browser.storage.local.get("pendingTransfer");
     var pending = storage.pendingTransfer;
     if (!pending) return null;
-    if (
-      typeof pending.link !== "string" ||
-      !pending.link ||
-      !Number.isFinite(pending.createdAt) ||
-      Date.now() - pending.createdAt > pendingMaxAge ||
-      ["ready", "sending", "uncertain"].indexOf(pending.phase) < 0 ||
-      (pending.provisionalToken !== undefined &&
-        (typeof pending.provisionalToken !== "string" || !pending.provisionalToken))
-    ) {
+    if (!isLivePendingTransfer(pending)) {
       if (clearExpired) await browser.storage.local.remove("pendingTransfer");
       return null;
     }
     return pending;
   });
+}
+
+function isLivePendingTransfer(pending) {
+  var token = pending.provisionalToken;
+  return (
+    typeof pending.link === "string" &&
+    pending.link !== "" &&
+    Number.isFinite(pending.createdAt) &&
+    Date.now() - pending.createdAt <= pendingMaxAge &&
+    ["ready", "sending", "uncertain"].indexOf(pending.phase) >= 0 &&
+    (token === undefined || (typeof token === "string" && token !== ""))
+  );
 }
 
 function savePendingTransfer(pending, phase) {
@@ -272,28 +265,19 @@ async function resumeTransfer() {
     // A terminated worker cannot tell whether this POST was accepted. Persist
     // before sending, and require the user to check transfers after a restart.
     await savePendingTransfer(pending, "sending");
-    var response = await startTransfer(token, pending.link);
-    if (response && response.ok) {
-      await clearPendingTransfer();
-      return;
-    }
-    if (response && response.status === 401) {
+    var outcome = await startTransfer(token, pending.link);
+    if (outcome === "rejected") {
       await savePendingTransfer(pending, "ready");
       await browser.storage.local.remove("token");
       token = null;
       continue;
     }
-    if (!response || response.status >= 500) {
+    if (outcome === "uncertain") {
       await savePendingTransfer(pending, "uncertain");
-      notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
     } else {
       await clearPendingTransfer();
-      notify(
-        "transfer-start-failure",
-        "transferFailureNotificationTitle",
-        "transferFailureNotificationMessage",
-      );
     }
+    notifyTransferOutcome(outcome);
     return;
   }
 }
@@ -326,9 +310,7 @@ async function startAuthFlow(pending) {
 async function validateAuthToken(token) {
   var result = await validateToken(token);
   if (result !== "ready") {
-    if (result === "unavailable") {
-      notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
-    }
+    if (result === "unavailable") notifyAuthUnavailable();
     return { state: result };
   }
   await browser.storage.local.set({ token: token });
@@ -348,10 +330,13 @@ async function validateToken(token) {
   }
 }
 
+// Resolves "ok", "rejected" (401), "failed" (other client error), or
+// "uncertain" (network failure or 5xx, the server may have accepted the POST).
 async function startTransfer(token, link) {
   notify("transfer-start", "transferStartNotificationTitle", "transferStartNotificationMessage");
+  var response;
   try {
-    return await fetch(apiURL + "/transfers/add", {
+    response = await fetch(apiURL + "/transfers/add", {
       method: "POST",
       body: JSON.stringify({ url: link }),
       headers: {
@@ -360,8 +345,27 @@ async function startTransfer(token, link) {
       },
     });
   } catch {
-    return null;
+    return "uncertain";
   }
+  if (response.ok) return "ok";
+  if (response.status === 401) return "rejected";
+  return response.status >= 500 ? "uncertain" : "failed";
+}
+
+function notifyTransferOutcome(outcome) {
+  if (outcome === "uncertain") {
+    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+  } else if (outcome === "failed") {
+    notify(
+      "transfer-start-failure",
+      "transferFailureNotificationTitle",
+      "transferFailureNotificationMessage",
+    );
+  }
+}
+
+function notifyAuthUnavailable() {
+  notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
 }
 
 function notify(id, titleKey, messageKey) {
