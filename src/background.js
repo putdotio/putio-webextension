@@ -34,24 +34,23 @@ browser.contextMenus.onClicked.addListener(function (item, tab) {
     return;
   }
 
-  getToken().then(function (token) {
-    if (!token) {
-      return startAuthFlow();
-    }
-
-    return startTransfer(token, link);
-  });
+  return sendSelectedLink(link).catch(notifyAuthUnavailable);
 });
 
 browser.notifications.onClicked.addListener(function (notificationId) {
-  if (notificationId === "transfer-start") {
-    browser.tabs.create({
-      active: true,
-      url: appURL + "/transfers",
+  browser.notifications.clear(notificationId);
+  if (notificationId === "transfer-start" || notificationId === "transfer-uncertain") {
+    browser.tabs.create({ active: true, url: appURL + "/transfers" });
+    return runOperation(async function () {
+      var pending = await getPendingTransfer();
+      if (pending && pending.phase !== "ready") {
+        await clearPendingTransfer();
+      }
     });
   }
-
-  browser.notifications.clear(notificationId);
+  if (notificationId === "auth-retry") {
+    return runOperation(resumeTransfer);
+  }
 });
 
 toolbarAction.onClicked.addListener(function () {
@@ -61,16 +60,31 @@ toolbarAction.onClicked.addListener(function () {
   });
 });
 
-function initialize() {
+async function initialize() {
   createContextMenus();
-
-  getToken().then(function (token) {
-    if (!token) {
-      return startAuthFlow();
+  // Startup validation must not block a click or invalidate a credential
+  // obtained by a user operation while this request was in flight.
+  var generation = operationGeneration;
+  var superseded = function () {
+    return generation !== operationGeneration || activeOperation !== null;
+  };
+  try {
+    var pending = await getPendingTransfer(false);
+    if (pending) notifyPending(pending);
+    var token = await getToken();
+    if (!token) return;
+    var result = await validateToken(token);
+    if (superseded()) return;
+    if (result === "rejected") {
+      if ((await getToken()) === token && !superseded()) {
+        await browser.storage.local.remove("token");
+      }
+    } else if (result === "unavailable") {
+      notifyAuthUnavailable();
     }
-
-    return validateToken(token, { notify: false });
-  });
+  } catch {
+    if (!superseded()) notifyAuthUnavailable();
+  }
 }
 
 function createContextMenus() {
@@ -101,103 +115,257 @@ function getToken() {
   });
 }
 
-function startAuthFlow() {
+// The promise serializes this worker only. The selected link and send phase are
+// durable, so restarting an MV3 worker cannot replay an uncertain POST.
+var activeOperation = null;
+var operationGeneration = 0;
+var pendingMaxAge = 15 * 60 * 1000;
+var pendingStorage = Promise.resolve();
+
+// Keep expiry reads/removals ordered with new recovery writes. This queue owns
+// storage operations only; it never waits for network requests or sign-in.
+function updatePendingStorage(operation) {
+  var result = pendingStorage.then(operation);
+  pendingStorage = result.catch(function () {});
+  return result;
+}
+
+function clearPendingTransfer() {
+  return updatePendingStorage(function () {
+    return browser.storage.local.remove("pendingTransfer");
+  });
+}
+
+async function sendSelectedLink(link) {
+  operationGeneration += 1;
+  var token = await getToken();
+  var pending = await getPendingTransfer();
+  if (!token || pending || activeOperation) {
+    return runOperation(function () {
+      return selectTransfer(link);
+    });
+  }
+
+  // Signed-in downloads can overlap. Only a link needing auth recovery owns
+  // the durable slot; ordinary POSTs are never replayed.
+  var outcome = await startTransfer(token, link);
+  if (outcome === "rejected") {
+    return runOperation(async function () {
+      if ((await getToken()) === token) await browser.storage.local.remove("token");
+      return selectTransfer(link);
+    });
+  }
+  notifyTransferOutcome(outcome);
+}
+
+function runOperation(operation) {
+  if (activeOperation) {
+    notify("auth-retry", "pendingTransferTitle", "pendingTransferMessage");
+    return activeOperation;
+  }
+  operationGeneration += 1;
+  activeOperation = Promise.resolve()
+    .then(operation)
+    .catch(notifyAuthUnavailable)
+    .finally(function () {
+      activeOperation = null;
+    });
+  return activeOperation;
+}
+
+function getPendingTransfer(clearExpired = true) {
+  return updatePendingStorage(async function () {
+    var storage = await browser.storage.local.get("pendingTransfer");
+    var pending = storage.pendingTransfer;
+    if (!pending) return null;
+    if (!isLivePendingTransfer(pending)) {
+      if (clearExpired) await browser.storage.local.remove("pendingTransfer");
+      return null;
+    }
+    return pending;
+  });
+}
+
+function isLivePendingTransfer(pending) {
+  var token = pending.provisionalToken;
+  return (
+    typeof pending.link === "string" &&
+    pending.link !== "" &&
+    Number.isFinite(pending.createdAt) &&
+    Date.now() - pending.createdAt <= pendingMaxAge &&
+    ["ready", "sending", "uncertain"].indexOf(pending.phase) >= 0 &&
+    (token === undefined || (typeof token === "string" && token !== ""))
+  );
+}
+
+function savePendingTransfer(pending, phase) {
+  return updatePendingStorage(function () {
+    return browser.storage.local.set({
+      pendingTransfer: {
+        link: pending.link,
+        createdAt: pending.createdAt,
+        phase: phase,
+        ...(phase === "ready" && pending.provisionalToken
+          ? { provisionalToken: pending.provisionalToken }
+          : {}),
+      },
+    });
+  });
+}
+
+function notifyPending(pending) {
+  if (pending.phase === "ready") {
+    notify("auth-retry", "pendingTransferTitle", "pendingTransferMessage");
+  } else {
+    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+  }
+}
+
+async function selectTransfer(link) {
+  var pending = await getPendingTransfer();
+  if (pending && (pending.link !== link || pending.phase !== "ready")) {
+    notifyPending(pending);
+    return;
+  }
+  if (!pending) {
+    await savePendingTransfer({ link: link, createdAt: Date.now() }, "ready");
+  }
+  return resumeTransfer();
+}
+
+async function resumeTransfer() {
+  var pending = await getPendingTransfer();
+  if (!pending) return;
+  if (pending.phase !== "ready") {
+    notifyPending(pending);
+    return;
+  }
+  var token = await getToken();
+  var authenticated = false;
+  while (true) {
+    if (!token) {
+      if (authenticated) {
+        await clearPendingTransfer();
+        notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
+        return;
+      }
+      authenticated = true;
+      var auth = pending.provisionalToken
+        ? await validateAuthToken(pending.provisionalToken)
+        : await startAuthFlow(pending);
+      if (auth.state === "cancelled" || auth.state === "rejected") {
+        await clearPendingTransfer();
+        notify("auth-cancelled", "authCancelledTitle", "authCancelledMessage");
+        return;
+      }
+      if (auth.state !== "ready") return;
+      token = auth.token;
+    }
+
+    // A terminated worker cannot tell whether this POST was accepted. Persist
+    // before sending, and require the user to check transfers after a restart.
+    await savePendingTransfer(pending, "sending");
+    var outcome = await startTransfer(token, pending.link);
+    if (outcome === "rejected") {
+      await savePendingTransfer(pending, "ready");
+      await browser.storage.local.remove("token");
+      token = null;
+      continue;
+    }
+    if (outcome === "uncertain") {
+      await savePendingTransfer(pending, "uncertain");
+    } else {
+      await clearPendingTransfer();
+    }
+    notifyTransferOutcome(outcome);
+    return;
+  }
+}
+
+async function startAuthFlow(pending) {
   var redirectURL = browser.identity.getRedirectURL();
   var authURL = apiURL + "/oauth2/authenticate";
   authURL += "?client_id=" + clientID;
   authURL += "&response_type=token";
   authURL += "&redirect_uri=" + encodeURIComponent(redirectURL);
+  var callback;
+  try {
+    callback = await browser.identity.launchWebAuthFlow({ interactive: true, url: authURL });
+  } catch {
+    return { state: "cancelled" };
+  }
+  var token;
+  try {
+    token = new URLSearchParams(new URL(callback).hash.slice(1)).get("access_token");
+  } catch {
+    return { state: "rejected" };
+  }
+  if (!token) return { state: "rejected" };
+  // A temporary validation outage must not require repeating interactive OAuth.
+  // The provisional credential expires and clears with this one saved action.
+  await savePendingTransfer({ ...pending, provisionalToken: token }, "ready");
+  return validateAuthToken(token);
+}
 
-  return browser.identity
-    .launchWebAuthFlow({
-      interactive: true,
-      url: authURL,
-    })
-    .then(handleAuthCallback)
-    .catch(function (error) {
-      console.error("PutioWebExtension - Auth flow failed: ", error);
+async function validateAuthToken(token) {
+  var result = await validateToken(token);
+  if (result !== "ready") {
+    if (result === "unavailable") notifyAuthUnavailable();
+    return { state: result };
+  }
+  await browser.storage.local.set({ token: token });
+  notify("validate-success", "welcomeNotificationTitle", "welcomeNotificationMessage");
+  return { state: "ready", token: token };
+}
+
+async function validateToken(token) {
+  try {
+    var response = await fetch(apiURL + "/oauth2/validate", {
+      headers: { authorization: "token " + token },
     });
-}
-
-function handleAuthCallback(redirectURL) {
-  // Cancellation rejects the promise (handled by the caller's catch); this
-  // guards a completed flow whose redirect carries no access token.
-  var token = redirectURL && redirectURL.split("#access_token=")[1];
-
-  if (!token) {
-    console.error("PutioWebExtension - Auth flow returned no access token");
-    return;
-  }
-
-  return validateToken(token, { notify: true });
-}
-
-function validateToken(token, options) {
-  return fetch(apiURL + "/oauth2/validate", {
-    headers: {
-      authorization: "token " + token,
-    },
-  })
-    .then(function (response) {
-      if (response.ok) {
-        return validateTokenSuccess(token, options);
-      }
-
-      return validateTokenFailure(response);
-    })
-    .catch(validateTokenFailure);
-}
-
-function validateTokenSuccess(token, options) {
-  console.log("PutioWebExtension - Token validated!");
-
-  browser.storage.local.set({
-    token: token,
-  });
-
-  if (options && options.notify) {
-    notify("validate-success", "welcomeNotificationTitle", "welcomeNotificationMessage");
+    if (response.ok) return "ready";
+    return response.status === 401 ? "rejected" : "unavailable";
+  } catch {
+    return "unavailable";
   }
 }
 
-function validateTokenFailure(error) {
-  console.error("PutioWebExtension - Token validation failed: ", error);
-  return startAuthFlow();
-}
-
-function startTransfer(token, link) {
+// Resolves "ok", "rejected" (401), "failed" (other client error), or
+// "uncertain" (network failure or 5xx, the server may have accepted the POST).
+async function startTransfer(token, link) {
   notify("transfer-start", "transferStartNotificationTitle", "transferStartNotificationMessage");
-
-  return fetch(apiURL + "/transfers/add", {
-    method: "POST",
-    body: JSON.stringify({ url: link }),
-    headers: {
-      Authorization: "token " + token,
-      "content-type": "application/json; charset=utf-8",
-    },
-  })
-    .then(function (response) {
-      if (response.ok) {
-        return startTransferSuccess();
-      }
-
-      return startTransferFailure(response);
-    })
-    .catch(startTransferFailure);
+  var response;
+  try {
+    response = await fetch(apiURL + "/transfers/add", {
+      method: "POST",
+      body: JSON.stringify({ url: link }),
+      headers: {
+        Authorization: "token " + token,
+        "content-type": "application/json; charset=utf-8",
+      },
+    });
+  } catch {
+    return "uncertain";
+  }
+  if (response.ok) return "ok";
+  if (response.status === 401) return "rejected";
+  return response.status >= 500 ? "uncertain" : "failed";
 }
 
-function startTransferSuccess() {
-  console.log("PutioWebExtension - Transfer started!");
+function notifyTransferOutcome(outcome) {
+  if (outcome === "uncertain") {
+    notify("transfer-uncertain", "transferUncertainTitle", "transferUncertainMessage");
+  } else if (outcome === "failed") {
+    notify(
+      "transfer-start-failure",
+      "transferFailureNotificationTitle",
+      "transferFailureNotificationMessage",
+    );
+  }
 }
 
-function startTransferFailure(error) {
-  console.error("PutioWebExtension - Transfer failed: ", error);
-
-  notify(
-    "transfer-start-failure",
-    "transferFailureNotificationTitle",
-    "transferFailureNotificationMessage",
-  );
+function notifyAuthUnavailable() {
+  notify("auth-retry", "authUnavailableTitle", "authUnavailableMessage");
 }
 
 function notify(id, titleKey, messageKey) {

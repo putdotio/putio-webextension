@@ -34,6 +34,9 @@ pnpm run check
 pnpm run build
 ```
 
+`check` runs the background-flow tests in `tests/`, which mock the browser and HTTP
+boundaries; `pnpm test` runs only those.
+
 If the change affects runtime behavior, load the built extension from `dist/` and manually
 exercise the right-click flow in the affected browser.
 CI runs the same check and build on pull requests and `main`.
@@ -50,3 +53,17 @@ CI runs the same check and build on pull requests and `main`.
 - Keep changes focused
 - Update both browser manifests when extension metadata should stay aligned
 - Include the browser flow you manually checked when behavior changes
+
+## Authentication recovery checks
+
+Use an isolated test browser profile. Select a link while signed out and confirm that
+completing sign-in sends that link once. Then check:
+
+- cancelling sign-in, or a rejected credential, clears the saved link and starts nothing
+- a second click during sign-in leaves the first link saved and shows the pending notification
+- a validation outage after OAuth keeps the saved link and its provisional token; clicking
+  the notification retries validation without reopening sign-in
+- signed-in downloads can overlap; only a link waiting on sign-in is saved, and it expires
+  after 15 minutes
+- a transfer interrupted mid-request is never resent: its notification opens the transfers
+  page and clears the saved link
