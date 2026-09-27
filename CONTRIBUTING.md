@@ -1,10 +1,6 @@
 # Contributing
 
-This repository contains the standalone browser extension for put.io.
-
 ## Setup
-
-Install dependencies from the repository root:
 
 ```bash
 pnpm install
@@ -12,41 +8,34 @@ pnpm install
 
 ## Local Testing
 
-Build the per-browser directories first:
-
 ```bash
 pnpm run build
 ```
 
-This emits `dist/chrome/` and `dist/firefox/` (each with a `manifest.json`) plus a store
-zip per browser under `dist/`. Zipping requires the external `zip` binary on PATH
+This emits loadable `dist/chrome/` and `dist/firefox/` directories plus a
+store zip per browser under `dist/`. Zipping needs the `zip` binary on `PATH`
 (preinstalled on macOS and the Ubuntu CI runners).
 
-- Chrome: `chrome://extensions` → enable Developer mode → Load unpacked → select `dist/chrome/`
-- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `dist/firefox/manifest.json`
+- Chrome: `chrome://extensions` → enable Developer mode → Load unpacked →
+  select `dist/chrome/`
+- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
+  select `dist/firefox/manifest.json`
 
 ## Validation
-
-Before opening a pull request:
 
 ```bash
 pnpm run check
 pnpm run build
 ```
 
-If the change affects runtime behavior, load the built extension from `dist/` and manually
+CI runs both on pull requests and `main`. `pnpm run format` applies the
+formatter. When runtime behavior changes, load the built extension and
 exercise the right-click flow in the affected browser.
-CI runs the same check and build on pull requests and `main`.
 
-## Development Notes
-
-- Keep end-user install and usage copy in [Overview](./README.md)
-- Keep repo rules, including the version-stamping and manifest-alignment invariants, in [Agent guide](./AGENTS.md)
-- Use `pnpm run format` to apply the Vite+ formatter before committing
-- Keep security reporting in [Security](./SECURITY.md)
+Repo invariants (version stamping, manifest alignment, MV3/MV2 split) live in
+the [Agent guide](./AGENTS.md#rules).
 
 ## Pull Requests
 
-- Keep changes focused
-- Update both browser manifests when extension metadata should stay aligned
-- Include the browser flow you manually checked when behavior changes
+- Update both browser manifests when extension metadata changes.
+- Name the browser flow you checked manually when behavior changes.

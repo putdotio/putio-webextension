@@ -20,14 +20,12 @@ Useful reports usually include issues involving:
 ## Guidelines
 
 - test only against accounts, environments, and data you control
-- keep testing non-destructive, low-volume, and limited to systems you control
+- keep testing non-destructive and low-volume
 - keep reports focused on technical vulnerabilities in this repository
 
 ## Supported Versions
 
-This repository does not currently publish a separate supported-version matrix.
-
-Please report issues against the latest published store version, or against `main` when the issue is only reproducible there.
+Report issues against the latest published store version, or against `main` when the issue only reproduces there.
 
 ## Disclosure
 

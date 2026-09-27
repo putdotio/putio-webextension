@@ -19,20 +19,16 @@
    </p>
 </div>
 
-## Overview
-
-`putio-webextension` adds a browser context-menu action for sending supported links to put.io.
-
 ## Install
-
-Install from the browser store:
 
 - Chrome: [Chrome Web Store](https://chrome.google.com/webstore/detail/putio/gmlaklldebhgnhfoppklejnjcmndcehf)
 - Firefox: [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/put-io)
 
 ## Use
 
-Right-click a supported link and send it to put.io from the browser context menu.
+Right-click a link and choose **Download link with put.io**, or right-click a
+page and choose **Download page with put.io**. The extension opens put.io
+sign-in when it is not yet authorized.
 
 ## Docs
 
