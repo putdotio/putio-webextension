@@ -7,7 +7,7 @@ Code lives in `src/`; `scripts/build.mjs` is the only packaging step.
 
 - [Overview](./README.md): install and use
 - [Contributing](./CONTRIBUTING.md): setup, build output, browser load steps, and validation
-- [Security](./SECURITY.md)
+- [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md)
 
 ## Commands
 
