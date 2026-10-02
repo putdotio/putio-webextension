@@ -33,5 +33,5 @@ sign-in when it is not yet authorized.
 ## Docs
 
 - [Contributing](./CONTRIBUTING.md) for setup, validation, and local testing
-- [Security](./SECURITY.md) for private vulnerability reporting
+- [Security](https://github.com/putdotio/.github/blob/main/SECURITY.md) for private vulnerability reporting
 - [Agent guide](./AGENTS.md) for repo-specific automation guidance
