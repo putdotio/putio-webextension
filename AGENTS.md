@@ -31,7 +31,15 @@ The `scripts` block in [package.json](./package.json) defines `check`,
 
 ## Validation
 
-- `pnpm run check` for any change.
+- `pnpm run check` for any change; docs-only changes need nothing else.
 - When behavior changes, also run `pnpm run build` and load the built
   extension in the affected browser
   ([load steps](./CONTRIBUTING.md#local-testing)).
+
+## Delivery
+
+Pull requests squash-merge to `main`, and a merge runs CI only; nothing in
+this repository publishes. Users get a change when someone bumps the
+`package.json` version and uploads the `dist/*.zip` packages to the Chrome Web
+Store and Firefox Add-ons. Those store submissions are manual, go through
+store review, and burn the version number.
