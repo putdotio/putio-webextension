@@ -25,8 +25,9 @@
   "main": "src/background.js",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "vp check .",
-    "format": "vp check --fix ."
+    "check": "vp check . && node --test",
+    "format": "vp check --fix .",
+    "test": "node --test"
   },
   "devDependencies": {
     "vite": "catalog:",
