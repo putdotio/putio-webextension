@@ -5,8 +5,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -14,9 +19,6 @@ jobs:
     name: Verify extension
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
-    concurrency:
-      group: verify-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
     permissions:
       contents: read
 
@@ -41,3 +43,8 @@ jobs:
 
       - name: Build extension packages
         run: vp run build
+
+      - uses: putdotio/.github/.github/actions/links@c1830f7938b7dc98f085082e988d3c46437bb15c # v1.2.0
+
+      - if: ${{ !cancelled() }}
+        uses: putdotio/.github/.github/actions/scan@c1830f7938b7dc98f085082e988d3c46437bb15c # v1.2.0

@@ -12,11 +12,13 @@ Code lives in `src/`; `scripts/build.mjs` is the only packaging step.
 ## Commands
 
 The `scripts` block in [package.json](./package.json) defines `check`,
-`format`, and `build`. CI runs `check` and `build` on pull requests and `main`;
-[Links](./.github/workflows/links.yml) checks relative Markdown links and
-anchors there too. [Scan](./.github/workflows/scan.yml) runs the shared secret
-scans (Gitleaks, TruffleHog) and workflow audits (Actionlint, Zizmor) on pull
-requests and weekly.
+`format`, and `build`. [CI](./.github/workflows/ci.yml) runs `check` and
+`build` on pull requests, `main`, and manual dispatch, then the shared
+[links](https://github.com/putdotio/.github#actionslinks) check of relative
+Markdown links and anchors and the shared
+[scan](https://github.com/putdotio/.github#actionsscan), which audits workflows
+with Actionlint and Zizmor when a `main` push changes `.github/` and on every
+dispatch. GitHub secret scanning and push protection cover secrets.
 
 ## Rules
 
