@@ -1,0 +1,2 @@
+# The manifest "key" is the extension's public key, which pins its Chrome ID; it is not a credential.
+1bea6b86b1b83de6fd9b4a80b5d904a0f3cc5f10:src/manifest.json:generic-api-key:13

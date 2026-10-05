@@ -14,7 +14,9 @@ Code lives in `src/`; `scripts/build.mjs` is the only packaging step.
 The `scripts` block in [package.json](./package.json) defines `check`,
 `format`, and `build`. CI runs `check` and `build` on pull requests and `main`;
 [Links](./.github/workflows/links.yml) checks relative Markdown links and
-anchors there too.
+anchors there too. [Scan](./.github/workflows/scan.yml) runs the shared secret
+scans (Gitleaks, TruffleHog) and workflow audits (Actionlint, Zizmor) on pull
+requests and weekly.
 
 ## Rules
 

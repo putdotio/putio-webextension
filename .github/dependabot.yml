@@ -4,6 +4,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 1
     groups:
       actions-patch-minor:
         update-types: ["patch", "minor"]
