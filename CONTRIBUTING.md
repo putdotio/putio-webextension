@@ -42,16 +42,19 @@ the [Agent guide](./AGENTS.md#rules).
 - Update both browser manifests when extension metadata changes.
 - Name the browser flow you checked manually when behavior changes.
 
-## Authentication recovery checks
+## Authentication Recovery Checks
 
-Use an isolated test browser profile. Select a link while signed out and confirm that
-completing sign-in sends that link once. Then check:
+Use an isolated test browser profile. Select a link while signed out and
+confirm that completing sign-in sends that link once. Then check:
 
-- cancelling sign-in, or a rejected credential, clears the saved link and starts nothing
-- a second click during sign-in leaves the first link saved and shows the pending notification
-- a validation outage after OAuth keeps the saved link and its provisional token; clicking
-  the notification retries validation without reopening sign-in
-- signed-in downloads can overlap; only a link waiting on sign-in is saved, and it expires
-  after 15 minutes
-- a transfer interrupted mid-request is never resent: its notification opens the transfers
-  page and clears the saved link
+- cancelling sign-in, or a rejected credential, clears the saved link and
+  starts nothing
+- a second click during sign-in leaves the first link saved and shows the
+  pending notification
+- a validation outage after OAuth keeps the saved link and its provisional
+  token; clicking the notification retries validation without reopening
+  sign-in
+- signed-in downloads can overlap; only a link waiting on sign-in is saved,
+  and it expires after 15 minutes
+- a transfer interrupted mid-request is never resent: its notification opens
+  the transfers page and clears the saved link
