@@ -1,28 +1,25 @@
 # Agent Guide
 
 Browser extension that sends links and pages to put.io from the context menu.
-Code lives in `src/`; `scripts/build.mjs` is the only packaging step.
+Code lives in `src/`; [scripts/build.mjs](./scripts/build.mjs) packages it.
 Setup and browser load steps live in [CONTRIBUTING](./CONTRIBUTING.md).
 
 ## Commands
 
 ```bash
 pnpm install
-pnpm run check   # format, lint, and tests/
-pnpm run format  # auto-fix format and lint issues
-pnpm run build   # dist/<browser>/ and store zips
+pnpm run check
+pnpm run format
+pnpm run build
 ```
 
 ## Rules
 
-- `package.json` `version` is the single version source. The build stamps it
-  into the emitted manifests; never add `version` to `src/manifest.*.json`.
 - Keep `src/manifest.chrome.json` and `src/manifest.firefox.json` aligned when
   metadata or permissions change.
-- Chrome uses MV3 (`background.service_worker`, `action`); Firefox stays on
-  MV2 (`background.scripts`, `browser_action`). `src/background.js` must work
-  in both: register listeners at top level and keep state in
-  `browser.storage`, not globals.
+- `src/background.js` runs as a Chrome MV3 service worker and a Firefox MV2
+  background script: register listeners at top level and keep state in
+  `browser.storage`.
 - Prefer simple background-script changes over adding build tooling.
 
 ## Validation
@@ -33,10 +30,7 @@ pnpm run build   # dist/<browser>/ and store zips
 
 ## Delivery
 
-- A merge to `main` runs only [CI](./.github/workflows/ci.yml); nothing here
-  publishes.
-- Store releases are manual: bump `version` in [package.json](./package.json),
-  run `pnpm run build`, and upload the `dist/*.zip` files from
-  [scripts/build.mjs](./scripts/build.mjs) to the Chrome Web Store and Firefox
-  Add-ons.
+- Nothing in CI publishes. Store releases are manual: bump `version` in
+  [package.json](./package.json), run `pnpm run build`, and upload the
+  `dist/*.zip` files to the Chrome Web Store and Firefox Add-ons.
 - Each store upload burns its version; never reuse one.
