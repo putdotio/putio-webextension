@@ -33,8 +33,10 @@ pnpm run build   # dist/<browser>/ and store zips
 
 ## Delivery
 
-Pull requests squash-merge to `main`; nothing in this repository publishes.
-Users get a change only after someone bumps the `package.json` version and
-uploads the `dist/*.zip` packages to the Chrome Web Store and Firefox Add-ons.
-Store submissions are manual, go through store review, and burn the version
-number.
+- A merge to `main` runs only [CI](./.github/workflows/ci.yml); nothing here
+  publishes.
+- Store releases are manual: bump `version` in [package.json](./package.json),
+  run `pnpm run build`, and upload the `dist/*.zip` files from
+  [scripts/build.mjs](./scripts/build.mjs) to the Chrome Web Store and Firefox
+  Add-ons.
+- Each store upload burns its version; never reuse one.
