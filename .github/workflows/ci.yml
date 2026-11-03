@@ -46,7 +46,7 @@ jobs:
       - name: Build extension packages
         run: vp run build
 
-      - uses: putdotio/.github/.github/actions/links@0299a68cb84725497b4349c6131aeec45c9611a5 # v2.3.2
+      - uses: putdotio/.github/.github/actions/links@e07dede03892f9b80fec82bf38afcd5f76b763b0 # v2.3.3
 
       - if: ${{ !cancelled() }}
-        uses: putdotio/.github/.github/actions/scan@0299a68cb84725497b4349c6131aeec45c9611a5 # v2.3.2
+        uses: putdotio/.github/.github/actions/scan@e07dede03892f9b80fec82bf38afcd5f76b763b0 # v2.3.3
